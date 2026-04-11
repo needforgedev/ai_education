@@ -14,11 +14,13 @@ class StudentHomeScreen extends StatefulWidget {
 class _StudentHomeScreenState extends State<StudentHomeScreen> {
   int _currentIndex = 0;
 
-  final _screens = const [
-    StudentDashboardScreen(),
-    CourseListScreen(),
-    CommunityScreen(),
-    LeaderboardScreen(),
+  late final List<Widget> _screens = [
+    StudentDashboardScreen(
+      onNavigateToCourses: () => setState(() => _currentIndex = 1),
+    ),
+    const CourseListScreen(),
+    const CommunityScreen(),
+    const LeaderboardScreen(),
   ];
 
   @override

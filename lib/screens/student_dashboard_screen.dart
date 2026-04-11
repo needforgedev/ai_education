@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../mock/mock_data.dart';
 import '../mock/app_state.dart';
-import 'course_list_screen.dart';
 import 'settings_screen.dart';
 
 class StudentDashboardScreen extends StatelessWidget {
-  const StudentDashboardScreen({super.key});
+  final VoidCallback? onNavigateToCourses;
+
+  const StudentDashboardScreen({super.key, this.onNavigateToCourses});
 
   @override
   Widget build(BuildContext context) {
@@ -121,13 +122,7 @@ class StudentDashboardScreen extends StatelessWidget {
                       SizedBox(
                         height: 40,
                         child: FilledButton.tonal(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const CourseListScreen(),
-                              ),
-                            );
-                          },
+                          onPressed: onNavigateToCourses,
                           child: const Text('Open Course'),
                         ),
                       ),
