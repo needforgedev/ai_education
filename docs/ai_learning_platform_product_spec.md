@@ -450,49 +450,75 @@ Leaderboard ranking can use:
 
 ### Onboarding Model
 
-The platform follows a school-first onboarding model. Schools are onboarded onto the platform first by the platform team. Once a school is onboarded, the school then registers and onboards its own students.
+The platform follows a school-first onboarding model. Schools are onboarded onto the platform first by the platform team. Once a school is onboarded, students can self-register using a school-specific registration code.
 
-Students cannot self-register independently — they must be part of an onboarded school.
+Students cannot self-register independently — they must have a valid school registration code.
 
 ### School Onboarding Flow
 
 1. platform team contacts and onboards a school
-2. school is created on the platform with its metadata
-3. school receives access to register its students
-4. school registers students or provides student lists for bulk creation
+2. platform team creates the school record in the database with a unique registration code (e.g. `SUNRISE-2026`)
+3. platform team shares the registration code with the school admin
+4. school admin distributes the code to students
+
+Schools are created directly in the Supabase database by the platform team (no admin UI in MVP). Each school record includes:
+
+- school name
+- registration code (unique, human-readable)
+- active status
 
 ### Student Registration Fields
 
 Recommended launch fields:
 
+- school registration code (validated against `schools` table — school name auto-populated, not editable)
 - full name
 - grade
-- school (pre-assigned based on school onboarding, not student-selected)
 - parent or guardian contact
-- email or phone based login method
-- password or OTP-based authentication
+- email
+- password (minimum 8 characters)
 
 ### Registration Outcome
 
 After registration:
 
-- student account is created under the onboarded school
+- student account is created under the onboarded school (linked via registration code)
 - cohort is assigned automatically based on grade
-- school association is pre-set from the onboarding process
+- school association is set from the validated registration code
 - dashboard opens with the first recommended course
 
 ### First-Time Student Onboarding Flow
 
 1. welcome screen
-2. enter registration code or credentials provided by school
-3. complete profile (name, grade, guardian contact)
-4. confirm assigned cohort
-5. show short platform intro
+2. enter school registration code
+3. app validates code and displays school name
+4. complete profile (name, grade, email, password, guardian contact)
+5. confirm assigned cohort
 6. open dashboard
 
 ### Moderator Onboarding
 
-Moderators should be created by admin invitation or admin-side provisioning, not self-serve public signup.
+Moderators are provisioned manually by the platform team. No self-serve signup.
+
+Moderator onboarding flow:
+
+1. platform team creates an auth user in Supabase (email + password)
+2. platform team inserts a row in the `moderators` table with the user's id, name, and email
+3. platform team shares login credentials with the moderator
+4. moderator logs in via the app's login screen
+
+Role detection at login:
+
+- app checks if the authenticated user's id exists in the `moderators` table
+- if yes: route to moderator dashboard
+- if no: check `students` table and route to student dashboard
+
+### Post-MVP Onboarding Enhancements
+
+- admin panel for bulk school and moderator creation
+- invite-by-email flow for moderators
+- school admin role for managing students within a school
+- bulk student import via CSV upload
 
 ## 14. Core Product Loop
 
@@ -950,15 +976,23 @@ MVP can be online-first, but should cache:
 
 ## 20. Recommended Runtime Data Objects
 
+### School
+
+- id
+- name
+- registrationCode (unique, human-readable, e.g. `SUNRISE-2026`)
+- isActive
+- createdAt
+
 ### StudentProfile
 
 - id
 - fullName
+- email
 - grade
 - cohortId
-- schoolId or schoolName
+- schoolId
 - guardianContact
-- role
 - joinedAt
 
 ### Cohort
@@ -998,17 +1032,38 @@ MVP can be online-first, but should cache:
 - attemptedAt
 - answers[]
 
+### ModuleProgress
+
+- id
+- studentId
+- moduleId
+- lessonViewedAt
+- quizPassedAt
+- bestQuizScore
+- completedAt
+
 ### FinalSubmission
 
 - id
 - studentId
 - courseId
 - fileUrl
-- note
+- fileName
+- fileType
+- notes
 - submittedAt
-- status
+- status (pending, graded)
 - scoreOutOf80
+- moderatorId
 - moderatorFeedback
+- gradedAt
+
+### Moderator
+
+- id
+- fullName
+- email
+- createdAt
 
 ### CourseProgress
 
@@ -1023,13 +1078,16 @@ MVP can be online-first, but should cache:
 ### CommunityThread
 
 - id
-- cohortId
+- schoolId (community is school-scoped per Section 11)
 - courseId
 - moduleId optional
 - authorId
+- authorName
 - title
 - body
-- status
+- isModeratorPost
+- isPinned
+- isHidden
 - createdAt
 
 ### CommunityReply
@@ -1050,6 +1108,17 @@ MVP can be online-first, but should cache:
 - metricType
 - score
 - rank
+
+### Notification
+
+- id
+- userId
+- type (submission_graded, moderator_reply, continue_reminder)
+- title
+- body
+- data (contextual JSON — courseId, threadId, etc.)
+- isRead
+- createdAt
 
 ## 21. Content Management Requirements
 
