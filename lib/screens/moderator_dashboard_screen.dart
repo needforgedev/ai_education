@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../mock/mock_data.dart';
 import '../mock/app_state.dart';
+import '../features/auth/providers/auth_provider.dart';
+import '../app/router.dart';
 import 'submission_review_screen.dart';
 import 'community_screen.dart';
-import 'welcome_screen.dart';
 
-class ModeratorDashboardScreen extends StatefulWidget {
+class ModeratorDashboardScreen extends ConsumerStatefulWidget {
   const ModeratorDashboardScreen({super.key});
 
   @override
-  State<ModeratorDashboardScreen> createState() =>
+  ConsumerState<ModeratorDashboardScreen> createState() =>
       _ModeratorDashboardScreenState();
 }
 
-class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
+class _ModeratorDashboardScreenState extends ConsumerState<ModeratorDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -66,13 +69,11 @@ class _ModeratorDashboardScreenState extends State<ModeratorDashboardScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () {
+                        onPressed: () async {
                           state.reset();
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                                builder: (_) => const WelcomeScreen()),
-                            (_) => false,
-                          );
+                          await ref.read(authProvider.notifier).signOut();
+                          if (!context.mounted) return;
+                          context.go(AppRoutes.welcome);
                         },
                         icon: const Icon(Icons.logout),
                         tooltip: 'Logout',

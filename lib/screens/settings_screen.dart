@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import '../mock/app_state.dart';
-import 'welcome_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../features/auth/providers/auth_provider.dart';
+import '../app/router.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final state = AppState();
+    final authState = ref.watch(authProvider);
+    final profile = authState.studentProfile;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -28,7 +31,8 @@ class SettingsScreen extends StatelessWidget {
                   radius: 28,
                   backgroundColor: theme.colorScheme.primaryContainer,
                   child: Text(
-                    (state.studentName ?? 'S')[0].toUpperCase(),
+                    (profile?.fullName ?? authState.user?.email ?? 'S')[0]
+                        .toUpperCase(),
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -42,19 +46,20 @@ class SettingsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        state.studentName ?? 'Student',
+                        profile?.fullName ?? authState.user?.email ?? 'User',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        'Grade ${state.grade ?? "--"} • ${state.cohort?.name ?? ""}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      if (profile != null)
+                        Text(
+                          'Grade ${profile.grade}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
                       Text(
-                        state.school ?? '',
+                        authState.user?.email ?? '',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -104,17 +109,14 @@ class SettingsScreen extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: OutlinedButton.icon(
-              onPressed: () {
-                state.reset();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                      builder: (_) => const WelcomeScreen()),
-                  (_) => false,
-                );
+              onPressed: () async {
+                await ref.read(authProvider.notifier).signOut();
+                if (!context.mounted) return;
+                context.go(AppRoutes.welcome);
               },
               icon: const Icon(Icons.logout, color: Colors.red),
-              label: const Text('Logout',
-                  style: TextStyle(color: Colors.red)),
+              label:
+                  const Text('Logout', style: TextStyle(color: Colors.red)),
             ),
           ),
         ],
@@ -151,7 +153,8 @@ class _SettingsTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       child: ListTile(
         leading: Icon(icon, color: theme.colorScheme.primary),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title:
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
