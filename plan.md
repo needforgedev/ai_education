@@ -1,7 +1,7 @@
 # AI Education Platform — Build Plan & Progress Tracker
 
 > **Last updated:** 2026-04-13
-> **Overall progress:** Phase 2 done, starting Phase 3 (Step 3 of 16)
+> **Overall progress:** Phase 3 in progress (Step 5 done, next: Step 6)
 
 ---
 
@@ -25,7 +25,7 @@
 |-------|-------------|--------|
 | Phase 1 | Drizzle Schema + Supabase Database | IN PROGRESS |
 | Phase 2 | Flutter Project Restructure | DONE |
-| Phase 3 | Feature Implementation | NOT STARTED |
+| Phase 3 | Feature Implementation | IN PROGRESS |
 | Phase 4 | Polish & Cleanup | NOT STARTED |
 
 ---
@@ -129,45 +129,47 @@
 ### Step 3: Data models
 > `lib/data/models/` — Dart classes with fromJson/toJson
 
-- [ ] `student.dart`
-- [ ] `cohort.dart`
-- [ ] `course.dart`
-- [ ] `module.dart`
-- [ ] `quiz_question.dart`
-- [ ] `quiz_attempt.dart`
-- [ ] `module_progress.dart`
-- [ ] `submission.dart`
-- [ ] `community_thread.dart`
-- [ ] `community_reply.dart`
-- [ ] `leaderboard_entry.dart`
-- [ ] `app_notification.dart`
+- [x] `school.dart`
+- [x] `student.dart`
+- [x] `cohort.dart`
+- [x] `course.dart`
+- [x] `module.dart` (class name: `CourseModule` to avoid Dart keyword conflict)
+- [x] `quiz_question.dart`
+- [x] `quiz_attempt.dart`
+- [x] `module_progress.dart`
+- [x] `submission.dart`
+- [x] `community_thread.dart`
+- [x] `community_reply.dart`
+- [x] `leaderboard_entry.dart` (maps to `course_progress` view)
+- [x] `app_notification.dart`
 
 ### Step 4: Auth
 > `lib/data/repositories/auth_repository.dart` + `lib/features/auth/`
 >
 > **School-first model (spec S13):** Students register under an onboarded school. Registration flow:
 > 1. Student enters a school registration code (provided by school admin)
-> 2. Code validates against `schools` table and pre-selects the school
+> 2. Code validates against `schools` table via `validate_school_code()` RPC
 > 3. Student fills remaining fields (name, grade, guardian contact, email, password)
 > 4. Cohort auto-assigned from grade
 >
 > Moderator accounts created via admin invite, not self-serve signup.
 
-- [ ] `auth_repository.dart` — signUp, signIn, signOut, onAuthStateChange stream
-- [ ] `student_repository.dart` — create/fetch student profile, validate school code
-- [ ] `auth_provider.dart` — Riverpod provider for auth state + current user
-- [ ] Migrate `welcome_screen.dart` to use Supabase auth
-- [ ] Create `login_screen.dart` (new — email/password, role selection)
-- [ ] Migrate `registration_screen.dart` — school code entry + real signUp + insert student row
-- [ ] Migrate `cohort_confirmation_screen.dart` — read cohort from DB
+- [x] `auth_repository.dart` — signUp, signIn, signOut, onAuthStateChange, getUserRole
+- [x] `student_repository.dart` — createProfile, getProfile, validateSchoolCode, getCohortForGrade
+- [x] `auth_provider.dart` — AuthNotifier StateNotifier with AuthState (user, role, studentProfile)
+- [x] Migrate `welcome_screen.dart` — routes to Login or Registration
+- [x] Create `login_screen.dart` — email/password, isModerator flag, role validation
+- [x] Migrate `registration_screen.dart` — 2-step flow: validate school code, then register
+- [x] Migrate `cohort_confirmation_screen.dart` — uses Cohort model instead of MockCohort
 
 ### Step 5: Router
 > `lib/app/router.dart`
 
-- [ ] Define all routes (auth, student, courses, quiz, community, leaderboard, moderator, settings)
-- [ ] Auth redirect guard — unauthenticated to `/auth/welcome`, authenticated skip auth pages
-- [ ] Role-based routing — student vs moderator dashboards
-- [ ] Wire GoRouter into `app.dart`
+- [x] Define all routes (auth: welcome, login, moderator-login, register, cohort-confirmation; student: home, course detail, module lesson, quiz, quiz result, submission, settings; moderator: dashboard, review)
+- [x] Auth redirect guard — unauthenticated to `/welcome`, authenticated skip auth pages
+- [x] Role-based routing — moderator → `/moderator`, student → `/`
+- [x] Wire GoRouter into `app.dart` (MaterialApp.router + ConsumerWidget)
+- [x] Migrate all auth screens from Navigator.push to context.push/context.go
 
 ### Step 6: Courses + Modules
 > `lib/data/repositories/` + `lib/features/courses/`

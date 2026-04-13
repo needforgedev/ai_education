@@ -24,13 +24,18 @@ CREATE POLICY "Anon can read active schools for registration"
 
 
 -- ============================================================
--- COHORTS (read-only for all authenticated users)
+-- COHORTS (read-only for all users, including anon during registration)
 -- ============================================================
 
 CREATE POLICY "Authenticated users can read cohorts"
   ON cohorts FOR SELECT
   TO authenticated
   USING (true);
+
+CREATE POLICY "Anon can read active cohorts for registration"
+  ON cohorts FOR SELECT
+  TO anon
+  USING (is_active = true);
 
 
 -- ============================================================
