@@ -68,7 +68,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            'Grade ${authState.studentProfile?.grade ?? ""}',
+                            '${authState.cohortName ?? ""}  •  ${authState.schoolName ?? ""}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

@@ -123,6 +123,8 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
             grade: _selectedGrade!,
             schoolId: _schoolId!,
             cohortId: cohort.id,
+            schoolName: _schoolName!,
+            cohortName: cohort.name,
             guardianContact: _parentController.text.trim().isNotEmpty
                 ? _parentController.text.trim()
                 : null,

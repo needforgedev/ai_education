@@ -803,12 +803,15 @@ Purpose: account and app preferences
 +--------------------------------------------------+
 | Settings                                         |
 | Profile                                          |
-| Password                                         |
+| Password → Change Password screen               |
 | Notifications                                    |
 | Help                                             |
+| About                                            |
 | Logout                                           |
 +--------------------------------------------------+
 ```
+
+The Change Password screen allows students and moderators to update their password in-app using `supabase.auth.updateUser()`. Requires new password (min 8 chars) + confirmation.
 
 ## 16. Moderator Experience
 

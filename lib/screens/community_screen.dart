@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../mock/app_state.dart';
+import '../features/auth/providers/auth_provider.dart';
 
-class CommunityScreen extends StatefulWidget {
+class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
 
   @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
+  ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> {
+class _CommunityScreenState extends ConsumerState<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final state = AppState();
+    final auth = ref.watch(authProvider);
 
     return SafeArea(
       child: ListenableBuilder(
@@ -38,7 +41,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             ),
                           ),
                           Text(
-                            '${state.school ?? "Your School"} — ${state.cohort?.name ?? ""}',
+                            '${auth.schoolName ?? "Your School"} — ${auth.cohortName ?? ""}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

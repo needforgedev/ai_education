@@ -14,12 +14,16 @@ class AuthState {
   final supa.User? user;
   final String? role; // 'student' | 'moderator' | null
   final Student? studentProfile;
+  final String? schoolName;
+  final String? cohortName;
   final bool isLoading;
 
   const AuthState({
     this.user,
     this.role,
     this.studentProfile,
+    this.schoolName,
+    this.cohortName,
     this.isLoading = false,
   });
 
@@ -32,6 +36,8 @@ class AuthState {
     supa.User? user,
     String? role,
     Student? studentProfile,
+    String? schoolName,
+    String? cohortName,
     bool? isLoading,
     bool clearUser = false,
     bool clearRole = false,
@@ -42,6 +48,8 @@ class AuthState {
       role: clearRole ? null : (role ?? this.role),
       studentProfile:
           clearProfile ? null : (studentProfile ?? this.studentProfile),
+      schoolName: schoolName ?? this.schoolName,
+      cohortName: cohortName ?? this.cohortName,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -82,15 +90,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     final role = await _authRepo.getUserRole(user.id);
     Student? profile;
+    String? schoolName;
+    String? cohortName;
 
     if (role == 'student') {
       profile = await _studentRepo.getProfile(user.id);
+      if (profile != null) {
+        schoolName = await _studentRepo.getSchoolName(profile.schoolId);
+        cohortName = await _studentRepo.getCohortName(profile.cohortId);
+      }
     }
 
     state = AuthState(
       user: user,
       role: role,
       studentProfile: profile,
+      schoolName: schoolName,
+      cohortName: cohortName,
       isLoading: false,
     );
   }
@@ -123,6 +139,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required int grade,
     required String schoolId,
     required String cohortId,
+    required String schoolName,
+    required String cohortName,
     String? guardianContact,
   }) async {
     state = state.copyWith(isLoading: true);
@@ -146,6 +164,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: user,
         role: 'student',
         studentProfile: profile,
+        schoolName: schoolName,
+        cohortName: cohortName,
         isLoading: false,
       );
     } catch (e) {

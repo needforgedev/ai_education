@@ -1,7 +1,7 @@
 # AI Education Platform — Build Plan & Progress Tracker
 
-> **Last updated:** 2026-04-13
-> **Overall progress:** Phase 3 in progress (Step 5 done, next: Step 6)
+> **Last updated:** 2026-04-14
+> **Overall progress:** Phase 3 in progress (Steps 1-5 done + auth bug fixes + password change, next: Step 6)
 
 ---
 
@@ -23,7 +23,7 @@
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| Phase 1 | Drizzle Schema + Supabase Database | IN PROGRESS |
+| Phase 1 | Drizzle Schema + Supabase Database | DONE |
 | Phase 2 | Flutter Project Restructure | DONE |
 | Phase 3 | Feature Implementation | IN PROGRESS |
 | Phase 4 | Polish & Cleanup | NOT STARTED |
@@ -62,41 +62,38 @@
 - [x] `index.ts` — barrel export
 
 ### 1.3 Apply to Supabase
-> Blocked — needs DATABASE_URL in `supabase/.env`
 
-- [ ] Create `supabase/.env` with real DATABASE_URL
-- [ ] Run `npx drizzle-kit generate` to create migration SQL
-- [ ] Run `npx drizzle-kit push` to apply schema to Supabase DB
-- [ ] Verify all 14 tables in Supabase dashboard
+- [x] Create `supabase/.env` with real DATABASE_URL
+- [x] Run `npx drizzle-kit generate` to create migration SQL
+- [x] Run `npx drizzle-kit push` to apply schema to Supabase DB
+- [x] Verify all 14 tables in Supabase dashboard
 
 ### 1.4 RLS policies
-> Apply after schema is pushed
 
-- [ ] Students: read own profile, read all courses/modules/questions, read/write own quiz_attempts & module_progress & submissions, read/write community scoped to own school, read own notifications
-- [ ] Moderators: read all students, read/write all submissions (grading), read/write all community (moderation), read all quiz_attempts, insert notifications for students
-- [ ] Public: no access
-- [ ] Enable RLS on all tables
+- [x] Enable RLS on all tables (01_enable_rls.sql)
+- [x] Create `is_moderator()` helper function (02_helper_functions.sql)
+- [x] All RLS policies applied (03_rls_policies.sql) — includes anon read on schools + cohorts for registration
+- [x] Storage policies applied (04_storage_policies.sql)
 
 ### 1.5 Supabase database views/functions
-> Needed for CourseProgress + Leaderboard (spec S9, S12, S20)
 
-- [ ] Create `course_progress` view — per student per course: completed_module_count, avg_quiz_score (best scores, normalized to 20), final_submission_score, total_score_out_of_100, completion_status
-- [ ] Create `leaderboard_ranked` function/view — ranked by total_score, filterable by course_id, cohort_id, school_id
+- [x] Create `course_progress` view (05_views.sql)
+- [x] Create `validate_school_code()` RPC function (05_views.sql)
+- [ ] Create `leaderboard_ranked` function/view — needed for Step 10
 
 ### 1.6 Storage
-- [ ] Create `submissions` bucket in Supabase dashboard
-- [ ] Set policy: students upload to `{student_id}/{course_id}/`, moderators read all
+- [x] Create `submissions` bucket in Supabase dashboard
+- [x] Set policy: students upload to `{student_id}/{course_id}/`, moderators read all
 
 ### 1.7 Seed data
 > Curriculum content is placeholder — final content authored separately
 
-- [ ] Create `supabase/src/seed.ts`
-- [ ] Seed 5 cohorts (Grades 3-4 through 11-12)
-- [ ] Seed sample schools
+- [x] Seed 5 cohorts (Grades 3-4 through 11-12) — done via Table Editor
+- [x] Seed sample schools with registration codes — done via Table Editor
 - [ ] Seed courses per cohort (placeholder content from current mock data)
 - [ ] Seed modules per course (placeholder content)
 - [ ] Seed quiz questions per module (placeholder content)
-- [ ] Run `npx tsx src/seed.ts` and verify data
+- [ ] Create `supabase/src/seed.ts` for repeatable seeding
 
 ---
 
@@ -171,6 +168,18 @@
 - [x] Wire GoRouter into `app.dart` (MaterialApp.router + ConsumerWidget)
 - [x] Migrate all auth screens from Navigator.push to context.push/context.go
 
+### Bug fixes (post Step 5)
+
+- [x] Fix `AuthState` name collision with Supabase's `AuthState` — prefixed with `supa.`
+- [x] Fix router redirect race condition — router was recreated on every auth change, destroying nav stack. Fixed with `refreshListenable` bridge pattern.
+- [x] Fix logout not clearing Supabase session — settings + moderator dashboard now call `signOut()` via Riverpod + navigate with GoRouter
+- [x] Fix old `lib/screens/welcome_screen.dart` being loaded after logout — all logouts now use `context.go(AppRoutes.welcome)` to reach new welcome screen
+- [x] Fix wrong creds showing no error — login screen stays on screen, shows error inline
+- [x] Fix anon RLS on `cohorts` — added anon read policy for registration flow
+- [x] Fix student dashboard showing "Hello, Student" — now reads real name from `authProvider`
+- [x] Add `change_password_screen.dart` — available from student settings + moderator dashboard
+- [x] Explicit `SignOutScope.local` on signOut + try/catch to clear state even on failure
+
 ### Step 6: Courses + Modules
 > `lib/data/repositories/` + `lib/features/courses/`
 
@@ -235,7 +244,9 @@
 - [ ] `dashboard_provider.dart` — aggregate progress from course_progress view
 - [ ] Migrate `student_dashboard_screen.dart` — real progress, continue learning, notification bell
 - [ ] Migrate `student_home_screen.dart` — wire tabs to new feature screens
-- [ ] Migrate `settings_screen.dart` — real logout via Supabase, profile from DB
+- [x] Migrate `settings_screen.dart` — real logout via Supabase, profile from auth provider (done early for bug fix)
+- [x] Create `change_password_screen.dart` — Supabase `updateUser` for password change
+- [x] `student_dashboard_screen.dart` — reads real student name from auth provider (partially migrated)
 
 ---
 
@@ -371,10 +382,10 @@ The app determines the role at login by checking if the user's `id` exists in th
 
 | # | Test | How to verify | Status |
 |---|------|---------------|--------|
-| 1 | Schema applied | All 14 tables visible in Supabase dashboard | [ ] |
+| 1 | Schema applied | All 14 tables visible in Supabase dashboard | [x] |
 | 2 | Seed data | Query `courses` table — rows present | [ ] |
-| 3 | Student registration | School code -> register -> row in `students` + `auth.users` | [ ] |
-| 4 | Student login | Login -> dashboard with real cohort/school | [ ] |
+| 3 | Student registration | School code -> register -> row in `students` + `auth.users` | [x] |
+| 4 | Student login | Login -> dashboard with real name | [x] |
 | 5 | Course listing | Courses filtered by student's cohort | [ ] |
 | 6 | Lesson viewed | Open module -> `lesson_viewed_at` set in module_progress | [ ] |
 | 7 | Quiz submission | Score in `quiz_attempts`, best score in module_progress | [ ] |
@@ -386,8 +397,9 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 13 | Leaderboard | Rankings match course_progress view | [ ] |
 | 14 | Notifications | Submission graded + moderator reply trigger notifications | [ ] |
 | 15 | RLS enforcement | Student A can't access Student B's data | [ ] |
-| 16 | Logout | Clears session, redirects to welcome | [ ] |
-| 17 | `flutter analyze` | Zero issues | [ ] |
+| 16 | Logout | Clears session, redirects to welcome | [x] |
+| 17 | `flutter analyze` | Zero issues (except test/widget_test.dart — cleanup step) | [x] |
+| 18 | Password change | Student + moderator can change password in-app | [x] |
 
 ---
 
@@ -395,6 +407,11 @@ The app determines the role at login by checking if the user's `id` exists in th
 
 | Date | Item | Status |
 |------|------|--------|
-| 2026-04-13 | Need DATABASE_URL in `supabase/.env` to run migrations | OPEN |
+| 2026-04-13 | Need DATABASE_URL in `supabase/.env` to run migrations | DONE |
 | 2026-04-13 | Curriculum content is placeholder — final content authored separately | NOTED |
 | 2026-04-13 | Offline caching (spec S19) deferred to post-MVP | NOTED |
+| 2026-04-14 | Supabase setup complete (tables, RLS, storage, auth, cohorts, schools, moderator) | DONE |
+| 2026-04-14 | Student registration + login + logout working end-to-end with Supabase | DONE |
+| 2026-04-14 | Moderator login + logout working end-to-end with Supabase | DONE |
+| 2026-04-14 | Password change available for both students and moderators | DONE |
+| 2026-04-14 | Courses/modules/quizzes still use mock data — need seed data or Steps 6-7 | OPEN |

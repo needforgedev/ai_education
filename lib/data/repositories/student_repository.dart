@@ -98,4 +98,24 @@ class StudentRepository {
 
     return result.map((e) => School.fromJson(e)).toList();
   }
+
+  /// Get the name of a school by ID.
+  Future<String?> getSchoolName(String schoolId) async {
+    final result = await supabase
+        .from(Tables.schools)
+        .select('name')
+        .eq('id', schoolId)
+        .maybeSingle();
+    return result?['name'] as String?;
+  }
+
+  /// Get the name of a cohort by ID.
+  Future<String?> getCohortName(String cohortId) async {
+    final result = await supabase
+        .from(Tables.cohorts)
+        .select('name')
+        .eq('id', cohortId)
+        .maybeSingle();
+    return result?['name'] as String?;
+  }
 }

@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../mock/mock_data.dart';
 import '../mock/app_state.dart';
+import '../features/auth/providers/auth_provider.dart';
 
-class LeaderboardScreen extends StatefulWidget {
+class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
 
   @override
-  State<LeaderboardScreen> createState() => _LeaderboardScreenState();
+  ConsumerState<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
 
-class _LeaderboardScreenState extends State<LeaderboardScreen> {
+class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   String _filter = 'overall'; // overall, course-specific id
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final state = AppState();
+    final auth = ref.watch(authProvider);
     final entries = state.getLeaderboard(
       courseId: _filter == 'overall' ? null : _filter,
     );
@@ -35,7 +38,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   ),
                 ),
                 Text(
-                  '${state.school ?? "Your School"} — ${state.cohort?.name ?? ""}',
+                  '${auth.schoolName ?? "Your School"} — ${auth.cohortName ?? ""}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
