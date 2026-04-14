@@ -35,9 +35,9 @@ class AuthRepository {
     return user;
   }
 
-  /// Sign out the current user.
+  /// Sign out the current user and clear the local session.
   Future<void> signOut() async {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(scope: supa.SignOutScope.local);
   }
 
   /// The currently authenticated user, or null.

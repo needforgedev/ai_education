@@ -155,7 +155,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
-    await _authRepo.signOut();
+    try {
+      await _authRepo.signOut();
+    } catch (_) {
+      // Clear state even if network call fails
+    }
     state = const AuthState();
   }
 

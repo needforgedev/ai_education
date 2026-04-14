@@ -42,13 +42,29 @@ class AppRoutes {
   static const submissionReview = '/moderator/review';
 }
 
+/// A ChangeNotifier that bridges Riverpod's AuthState to GoRouter's
+/// refreshListenable. This lets GoRouter re-evaluate its redirect
+/// without recreating the entire router (which destroys nav stack).
+class _AuthNotifierBridge extends ChangeNotifier {
+  _AuthNotifierBridge(Ref ref) {
+    ref.listen<AuthState>(authProvider, (_, _) {
+      notifyListeners();
+    });
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final authNotifier = _AuthNotifierBridge(ref);
 
   return GoRouter(
     initialLocation: AppRoutes.welcome,
     debugLogDiagnostics: false,
+    refreshListenable: authNotifier,
     redirect: (context, state) {
+      // Read the CURRENT auth state inside redirect (not watched)
+      final container = ProviderScope.containerOf(context);
+      final authState = container.read(authProvider);
+
       final isLoading = authState.isLoading;
       final isAuthenticated = authState.isAuthenticated;
       final location = state.matchedLocation;
@@ -56,18 +72,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       // While loading auth state, don't redirect
       if (isLoading) return null;
 
-      // Not authenticated — only allow auth routes
+      final isPublicRoute = location == AppRoutes.welcome ||
+          location == AppRoutes.login ||
+          location == AppRoutes.moderatorLogin ||
+          location == AppRoutes.register ||
+          location == AppRoutes.cohortConfirmation;
+
+      // Not authenticated — only allow public routes
       if (!isAuthenticated) {
-        final isPublicRoute = location == AppRoutes.welcome ||
-            location == AppRoutes.login ||
-            location == AppRoutes.moderatorLogin ||
-            location == AppRoutes.register;
         return isPublicRoute ? null : AppRoutes.welcome;
       }
 
-      // Authenticated — redirect ONLY from welcome page to dashboard.
-      // Don't redirect from login/register/cohort-confirmation —
-      // those screens handle their own post-auth navigation.
+      // Authenticated and on the welcome page only — redirect to dashboard.
+      // Don't redirect from login/register/cohort — those handle their own nav.
       if (isAuthenticated && location == AppRoutes.welcome) {
         if (authState.isModerator) return AppRoutes.moderatorDashboard;
         if (authState.isStudent) return AppRoutes.home;
@@ -107,9 +124,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // ---- Student routes ----
-      // These still use old screens with mock types. The `extra` map passes
-      // the mock objects directly. These will be updated when each feature
-      // is migrated in Steps 6-10.
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const StudentHomeScreen(),
