@@ -7,6 +7,7 @@ import '../features/auth/providers/auth_provider.dart';
 import '../app/router.dart';
 import 'submission_review_screen.dart';
 import 'community_screen.dart';
+import 'change_password_screen.dart';
 
 class ModeratorDashboardScreen extends ConsumerStatefulWidget {
   const ModeratorDashboardScreen({super.key});
@@ -67,6 +68,17 @@ class _ModeratorDashboardScreenState extends ConsumerState<ModeratorDashboardScr
                             ),
                           ],
                         ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ChangePasswordScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.settings_outlined),
+                        tooltip: 'Change Password',
                       ),
                       IconButton(
                         onPressed: () async {
