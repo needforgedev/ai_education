@@ -1,7 +1,7 @@
 # AI Education Platform — Build Plan & Progress Tracker
 
 > **Last updated:** 2026-04-14
-> **Overall progress:** Phase 3 in progress (Steps 1-5 done + auth bug fixes + password change, next: Step 6)
+> **Overall progress:** Phase 3 in progress (Steps 1-5 + 9 done + auth bug fixes + password change, next: Step 6)
 
 ---
 
@@ -179,6 +179,9 @@
 - [x] Fix student dashboard showing "Hello, Student" — now reads real name from `authProvider`
 - [x] Add `change_password_screen.dart` — available from student settings + moderator dashboard
 - [x] Explicit `SignOutScope.local` on signOut + try/catch to clear state even on failure
+- [x] Add `schoolName` + `cohortName` to `AuthState` — fetched from DB via `getSchoolName`/`getCohortName`
+- [x] Student dashboard, community, leaderboard screens show real school/cohort names
+- [x] Moderator dashboard community link → new drill-down `ModeratorCommunityScreen` (schools → threads → replies)
 
 ### Step 6: Courses + Modules
 > `lib/data/repositories/` + `lib/features/courses/`
@@ -209,9 +212,13 @@
 ### Step 9: Community
 > `lib/data/repositories/community_repository.dart` + `lib/features/community/`
 
-- [ ] `community_repository.dart` — getThreads (school-scoped), createThread, addReply, hidePost, pinThread
-- [ ] `community_provider.dart` — with Supabase Realtime subscription
-- [ ] Migrate `community_screen.dart` — real threads/replies, school isolation, moderator badges
+- [x] `community_repository.dart` — getThreads (school-scoped), getAllThreads (moderator), getSchoolsList, createThread, addReply, getReplies
+- [x] `community_provider.dart` — AsyncNotifier with Supabase Realtime subscription for new threads
+- [x] Migrate `community_screen.dart` — real threads/replies from Supabase, school isolation, moderator badges, pull-to-refresh, loading/empty/error states
+- [x] Create `moderator_community_screen.dart` — drill-down: Schools list → School threads → Thread detail with reply
+- [x] Fix `CommunityThread.fromJson` crash on aggregate count data
+- [x] `AuthState` extended with `schoolName` + `cohortName` (fetched from DB on login)
+- [x] Community + Leaderboard + Dashboard screens show real school/cohort names from auth provider
 
 ### Step 10: Leaderboard
 > `lib/data/repositories/leaderboard_repository.dart` + `lib/features/leaderboard/`
@@ -393,13 +400,17 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 9 | Course score | Avg quiz (normalized/20) + submission (/80) = total /100 | [ ] |
 | 10 | File upload | Submission file in Storage bucket | [ ] |
 | 11 | Moderator grading | Grade -> student sees score + notification | [ ] |
-| 12 | Community isolation | School A can't see School B threads | [ ] |
+| 12 | Community isolation | School A can't see School B threads | [x] |
 | 13 | Leaderboard | Rankings match course_progress view | [ ] |
 | 14 | Notifications | Submission graded + moderator reply trigger notifications | [ ] |
 | 15 | RLS enforcement | Student A can't access Student B's data | [ ] |
 | 16 | Logout | Clears session, redirects to welcome | [x] |
 | 17 | `flutter analyze` | Zero issues (except test/widget_test.dart — cleanup step) | [x] |
 | 18 | Password change | Student + moderator can change password in-app | [x] |
+| 19 | Community threads | Student can create thread + view replies from Supabase | [x] |
+| 20 | Community replies | Student can reply to thread, reply saved in Supabase | [x] |
+| 21 | Moderator community | Moderator sees schools list → school threads → can reply | [x] |
+| 22 | School/cohort names | Dashboard, community, leaderboard show real names | [x] |
 
 ---
 
@@ -415,3 +426,5 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 2026-04-14 | Moderator login + logout working end-to-end with Supabase | DONE |
 | 2026-04-14 | Password change available for both students and moderators | DONE |
 | 2026-04-14 | Courses/modules/quizzes still use mock data — need seed data or Steps 6-7 | OPEN |
+| 2026-04-14 | Community fully migrated to Supabase (student + moderator views) | DONE |
+| 2026-04-14 | School/cohort names populated from DB on login | DONE |
