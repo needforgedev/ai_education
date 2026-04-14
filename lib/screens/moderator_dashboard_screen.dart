@@ -6,7 +6,7 @@ import '../mock/app_state.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../app/router.dart';
 import 'submission_review_screen.dart';
-import 'community_screen.dart';
+import 'moderator_community_screen.dart';
 import 'change_password_screen.dart';
 
 class ModeratorDashboardScreen extends ConsumerStatefulWidget {
@@ -170,11 +170,8 @@ class _ModeratorDashboardScreenState extends ConsumerState<ModeratorDashboardScr
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => Scaffold(
-                              appBar:
-                                  AppBar(title: const Text('Community')),
-                              body: const CommunityScreen(),
-                            ),
+                            builder: (_) =>
+                                const ModeratorCommunityScreen(),
                           ),
                         );
                       },
