@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../mock/mock_data.dart';
 import '../mock/app_state.dart';
+import '../features/auth/providers/auth_provider.dart';
 import 'settings_screen.dart';
 
-class StudentDashboardScreen extends StatelessWidget {
+class StudentDashboardScreen extends ConsumerWidget {
   final VoidCallback? onNavigateToCourses;
 
   const StudentDashboardScreen({super.key, this.onNavigateToCourses});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final state = AppState();
-    final firstName = (state.studentName ?? 'Student').split(' ').first;
+    final authState = ref.watch(authProvider);
+    final studentName = authState.studentProfile?.fullName ?? 'Student';
+    final firstName = studentName.split(' ').first;
 
     return SafeArea(
       child: ListenableBuilder(
@@ -64,7 +68,7 @@ class StudentDashboardScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${state.cohort?.name ?? ""}  •  ${state.school ?? ""}',
+                            'Grade ${authState.studentProfile?.grade ?? ""}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

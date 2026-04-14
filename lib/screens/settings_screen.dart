@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../app/router.dart';
+import 'change_password_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -82,7 +83,13 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.lock_outline,
             title: 'Password',
             subtitle: 'Change your password',
-            onTap: () => _showComingSoon(context),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ChangePasswordScreen(),
+                ),
+              );
+            },
           ),
           _SettingsTile(
             icon: Icons.notifications_outlined,
