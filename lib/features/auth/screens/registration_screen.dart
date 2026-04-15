@@ -208,6 +208,43 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                       : const Text('Validate Code'),
                 ),
               ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: Divider(color: theme.colorScheme.outline.withValues(alpha: 0.3))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'OR',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: theme.colorScheme.outline.withValues(alpha: 0.3))),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: FilledButton.tonal(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          _schoolCodeController.text = 'INDEPENDENT';
+                          _validateSchoolCode();
+                        },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person_outline, size: 18, color: theme.colorScheme.onSecondaryContainer),
+                      const SizedBox(width: 8),
+                      const Text('Continue as Independent Learner'),
+                    ],
+                  ),
+                ),
+              ),
             ],
 
             // Step 2: School confirmed — show name + registration form
