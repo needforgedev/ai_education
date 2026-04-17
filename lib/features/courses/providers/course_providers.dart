@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/connectivity/connectivity_provider.dart';
 import '../../../core/sync/learning_sync_provider.dart';
 import '../../../data/models/course.dart';
 import '../../../data/models/module.dart';
@@ -28,7 +29,8 @@ final modulesForCourseProvider =
 });
 
 /// Module progress for the current student, keyed by moduleId.
-/// Cache-aware: online fetches hit Supabase + write cache; offline reads fall back to cache.
+/// Cache-aware: online fetches hit Supabase + write cache; offline reads fall back to cache
+/// immediately (no network timeout wait).
 final moduleProgressForCourseProvider = FutureProvider.family<
     Map<String, ModuleProgress>, String>((ref, courseId) async {
   final auth = ref.watch(authProvider);
@@ -38,10 +40,12 @@ final moduleProgressForCourseProvider = FutureProvider.family<
   final modules = await ref.watch(modulesForCourseProvider(courseId).future);
   if (modules.isEmpty) return {};
 
+  final online = ref.watch(isOnlineProvider);
   final repo = ref.read(moduleRepositoryProvider);
   return repo.getProgressForCourseModules(
     studentId: profile.id,
     courseId: courseId,
     moduleIds: modules.map((m) => m.id).toList(),
+    preferCacheOnly: !online,
   );
 });

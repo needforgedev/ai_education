@@ -39,7 +39,7 @@ class CommunityRepository {
         .from(Tables.schools)
         .select('id, name')
         .eq('is_active', true)
-        .order('name');
+        .order('name', ascending: true);
 
     return (result as List<dynamic>)
         .map((e) => {
@@ -56,7 +56,7 @@ class CommunityRepository {
         .select()
         .eq('thread_id', threadId)
         .eq('is_hidden', false)
-        .order('created_at');
+        .order('created_at', ascending: true);
 
     return (result as List<dynamic>)
         .map((e) => CommunityReply.fromJson(e as Map<String, dynamic>))

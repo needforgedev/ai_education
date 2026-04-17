@@ -31,7 +31,7 @@ class ModuleRepository {
         .from(Tables.modules)
         .select()
         .eq('course_id', courseId)
-        .order('order_index');
+        .order('order_index', ascending: true);
 
     return (result as List)
         .map((e) => CourseModule.fromJson(e as Map<String, dynamic>))
@@ -61,13 +61,19 @@ class ModuleRepository {
 
   /// Fetch all module progress rows for a student across a course.
   /// Online: fetches from Supabase and caches to Hive.
-  /// Offline: falls back to the Hive cache so module unlock still works.
+  /// Offline: returns cached progress immediately (no network timeout).
+  /// Pass `preferCacheOnly: true` to skip the network attempt entirely.
   Future<Map<String, ModuleProgress>> getProgressForCourseModules({
     required String studentId,
     required String courseId,
     required List<String> moduleIds,
+    bool preferCacheOnly = false,
   }) async {
     if (moduleIds.isEmpty) return {};
+
+    if (preferCacheOnly) {
+      return _readProgressFromCache(studentId: studentId, courseId: courseId);
+    }
 
     try {
       final result = await supabase
@@ -88,13 +94,20 @@ class ModuleRepository {
 
       return {for (final p in list) p.moduleId: p};
     } catch (_) {
-      final cached = _cache.getProgressForCourse(
-        studentId: studentId,
-        courseId: courseId,
-      );
-      if (cached == null) return {};
-      return {for (final p in cached) p.moduleId: p};
+      return _readProgressFromCache(studentId: studentId, courseId: courseId);
     }
+  }
+
+  Map<String, ModuleProgress> _readProgressFromCache({
+    required String studentId,
+    required String courseId,
+  }) {
+    final cached = _cache.getProgressForCourse(
+      studentId: studentId,
+      courseId: courseId,
+    );
+    if (cached == null) return {};
+    return {for (final p in cached) p.moduleId: p};
   }
 
   /// Mark a lesson as viewed. Upserts module_progress row. Online-only.

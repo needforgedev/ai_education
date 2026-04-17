@@ -12,13 +12,27 @@ class LearningCache {
   static const String _progressBoxName = 'module_progress_by_student_course';
   static const String _metaBoxName = 'learning_meta';
   static const String _lastSyncedKey = 'last_synced_at';
+  static const String _schemaVersionKey = 'schema_version';
+
+  // Bump when the cached data shape or ordering changes so stale caches
+  // are flushed on next launch. v2 = fixed descending .order() bug that stored
+  // modules in reverse order.
+  static const int _currentSchemaVersion = 2;
 
   static Future<void> init() async {
     await Hive.initFlutter();
     await Hive.openBox<dynamic>(_coursesBoxName);
     await Hive.openBox<dynamic>(_modulesBoxName);
     await Hive.openBox<dynamic>(_progressBoxName);
-    await Hive.openBox<dynamic>(_metaBoxName);
+    final meta = await Hive.openBox<dynamic>(_metaBoxName);
+
+    final storedVersion = meta.get(_schemaVersionKey) as int?;
+    if (storedVersion != _currentSchemaVersion) {
+      await Hive.box<dynamic>(_coursesBoxName).clear();
+      await Hive.box<dynamic>(_modulesBoxName).clear();
+      await Hive.box<dynamic>(_progressBoxName).clear();
+      await meta.put(_schemaVersionKey, _currentSchemaVersion);
+    }
   }
 
   Box<dynamic> get _coursesBox => Hive.box<dynamic>(_coursesBoxName);

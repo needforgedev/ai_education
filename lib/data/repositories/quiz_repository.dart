@@ -9,7 +9,7 @@ class QuizRepository {
         .from(Tables.quizQuestions)
         .select()
         .eq('module_id', moduleId)
-        .order('order_index');
+        .order('order_index', ascending: true);
 
     return (result as List)
         .map((e) => QuizQuestion.fromJson(e as Map<String, dynamic>))

@@ -32,7 +32,7 @@ class CourseRepository {
         .select()
         .eq('cohort_id', cohortId)
         .eq('is_published', true)
-        .order('order_index');
+        .order('order_index', ascending: true);
 
     return (result as List)
         .map((e) => Course.fromJson(e as Map<String, dynamic>))

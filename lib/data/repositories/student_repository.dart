@@ -69,7 +69,7 @@ class StudentRepository {
         .from(Tables.cohorts)
         .select()
         .eq('is_active', true)
-        .order('min_grade');
+        .order('min_grade', ascending: true);
 
     return result.map((e) => Cohort.fromJson(e)).toList();
   }
@@ -94,7 +94,7 @@ class StudentRepository {
         .from(Tables.schools)
         .select()
         .eq('is_active', true)
-        .order('name');
+        .order('name', ascending: true);
 
     return result.map((e) => School.fromJson(e)).toList();
   }
