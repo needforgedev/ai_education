@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supa;
+import '../../../core/cache/learning_cache_provider.dart';
+import '../../../core/cache/user_cache.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../../data/repositories/student_repository.dart';
 import '../../../data/models/student.dart';
@@ -60,9 +62,10 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _authRepo;
   final StudentRepository _studentRepo;
+  final UserCache _userCache;
   StreamSubscription<supa.AuthState>? _authSub;
 
-  AuthNotifier(this._authRepo, this._studentRepo)
+  AuthNotifier(this._authRepo, this._studentRepo, this._userCache)
       : super(const AuthState(isLoading: true)) {
     _init();
   }
@@ -70,7 +73,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _init() async {
     final user = _authRepo.currentUser;
     if (user != null) {
-      await _loadUserProfile(user);
+      // Hydrate from cache immediately so the app opens to the dashboard
+      // without needing a network round-trip (offline-friendly cold start).
+      final cached = _userCache.load(user.id);
+      if (cached != null) {
+        state = AuthState(
+          user: user,
+          role: cached.role,
+          studentProfile: cached.studentProfile,
+          schoolName: cached.schoolName,
+          cohortName: cached.cohortName,
+          isLoading: false,
+        );
+        // Best-effort background refresh; if offline this just fails silently.
+        unawaited(_refreshUserProfile(user));
+      } else {
+        await _loadUserProfile(user);
+      }
     } else {
       state = const AuthState();
     }
@@ -87,28 +106,82 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _loadUserProfile(supa.User user) async {
     state = state.copyWith(user: user, isLoading: true);
+    try {
+      final role = await _authRepo.getUserRole(user.id);
+      Student? profile;
+      String? schoolName;
+      String? cohortName;
 
-    final role = await _authRepo.getUserRole(user.id);
-    Student? profile;
-    String? schoolName;
-    String? cohortName;
-
-    if (role == 'student') {
-      profile = await _studentRepo.getProfile(user.id);
-      if (profile != null) {
-        schoolName = await _studentRepo.getSchoolName(profile.schoolId);
-        cohortName = await _studentRepo.getCohortName(profile.cohortId);
+      if (role == 'student') {
+        profile = await _studentRepo.getProfile(user.id);
+        if (profile != null) {
+          schoolName = await _studentRepo.getSchoolName(profile.schoolId);
+          cohortName = await _studentRepo.getCohortName(profile.cohortId);
+        }
       }
-    }
 
-    state = AuthState(
-      user: user,
-      role: role,
-      studentProfile: profile,
-      schoolName: schoolName,
-      cohortName: cohortName,
-      isLoading: false,
-    );
+      state = AuthState(
+        user: user,
+        role: role,
+        studentProfile: profile,
+        schoolName: schoolName,
+        cohortName: cohortName,
+        isLoading: false,
+      );
+
+      if (role != null) {
+        await _userCache.save(
+          userId: user.id,
+          role: role,
+          studentProfile: profile,
+          schoolName: schoolName,
+          cohortName: cohortName,
+        );
+      }
+    } catch (_) {
+      // Offline and no cache: leave user signed in but without role.
+      // Router stays on welcome; user can retry when back online.
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
+  /// Background refresh after hydrating from cache. Never throws.
+  Future<void> _refreshUserProfile(supa.User user) async {
+    try {
+      final role = await _authRepo.getUserRole(user.id);
+      if (role == null) return;
+
+      Student? profile;
+      String? schoolName;
+      String? cohortName;
+
+      if (role == 'student') {
+        profile = await _studentRepo.getProfile(user.id);
+        if (profile != null) {
+          schoolName = await _studentRepo.getSchoolName(profile.schoolId);
+          cohortName = await _studentRepo.getCohortName(profile.cohortId);
+        }
+      }
+
+      state = AuthState(
+        user: user,
+        role: role,
+        studentProfile: profile,
+        schoolName: schoolName,
+        cohortName: cohortName,
+        isLoading: false,
+      );
+
+      await _userCache.save(
+        userId: user.id,
+        role: role,
+        studentProfile: profile,
+        schoolName: schoolName,
+        cohortName: cohortName,
+      );
+    } catch (_) {
+      // Swallow — keep whatever was hydrated from cache.
+    }
   }
 
   /// Sign in with email/password, then load role + profile.
@@ -168,6 +241,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         cohortName: cohortName,
         isLoading: false,
       );
+
+      await _userCache.save(
+        userId: user.id,
+        role: 'student',
+        studentProfile: profile,
+        schoolName: schoolName,
+        cohortName: cohortName,
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;
@@ -180,6 +261,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {
       // Clear state even if network call fails
     }
+    await _userCache.clear();
     state = const AuthState();
   }
 
@@ -195,5 +277,6 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(
     ref.read(authRepositoryProvider),
     ref.read(studentRepositoryProvider),
+    ref.read(userCacheProvider),
   );
 });

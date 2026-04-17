@@ -7,6 +7,8 @@ import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/registration_screen.dart';
 import '../features/auth/screens/cohort_confirmation_screen.dart';
 import '../data/models/cohort.dart';
+import '../data/models/course.dart';
+import '../data/models/module.dart';
 
 // Old screens still in lib/screens/ — will migrate to features/ in later steps
 import '../screens/student_home_screen.dart';
@@ -132,7 +134,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.courseDetail,
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
-          return CourseDetailScreen(course: extra['course']);
+          return CourseDetailScreen(course: extra['course'] as Course);
         },
       ),
       GoRoute(
@@ -140,8 +142,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
           return ModuleLessonScreen(
-            module: extra['module'],
-            moduleIndex: int.parse(state.pathParameters['moduleIndex']!),
+            module: extra['module'] as CourseModule,
           );
         },
       ),
@@ -149,10 +150,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.quiz,
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
-          return QuizScreen(
-            module: extra['module'],
-            moduleIndex: int.parse(state.pathParameters['moduleIndex']!),
-          );
+          return QuizScreen(module: extra['module'] as CourseModule);
         },
       ),
       GoRoute(
@@ -160,13 +158,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
           return QuizResultScreen(
-            module: extra['module'],
-            moduleIndex: extra['moduleIndex'] as int,
+            module: extra['module'] as CourseModule,
             score: extra['score'] as int,
             totalQuestions: extra['totalQuestions'] as int,
             correctAnswers: extra['correctAnswers'] as int,
             isNewBest: extra['isNewBest'] as bool,
             passed: extra['passed'] as bool,
+            previousBest: extra['previousBest'] as int?,
           );
         },
       ),
@@ -174,7 +172,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.finalSubmission,
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
-          return FinalSubmissionScreen(course: extra['course']);
+          return FinalSubmissionScreen(course: extra['course'] as Course);
         },
       ),
       GoRoute(

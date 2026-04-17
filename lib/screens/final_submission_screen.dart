@@ -1,23 +1,29 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import '../mock/mock_data.dart';
-import '../mock/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/connectivity/connectivity_provider.dart';
+import '../data/models/course.dart';
+import '../data/models/submission.dart';
+import '../features/auth/providers/auth_provider.dart';
+import '../features/submissions/providers/submission_providers.dart';
 
-class FinalSubmissionScreen extends StatefulWidget {
-  final MockCourse course;
+const _allowedExtensions = ['pdf', 'txt', 'py', 'js', 'dart'];
+
+class FinalSubmissionScreen extends ConsumerStatefulWidget {
+  final Course course;
 
   const FinalSubmissionScreen({super.key, required this.course});
 
   @override
-  State<FinalSubmissionScreen> createState() => _FinalSubmissionScreenState();
+  ConsumerState<FinalSubmissionScreen> createState() =>
+      _FinalSubmissionScreenState();
 }
 
-class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
+class _FinalSubmissionScreenState extends ConsumerState<FinalSubmissionScreen> {
   final _notesController = TextEditingController();
-  String? _selectedFileName;
-  String _selectedFileType = '.pdf';
-  bool _submitted = false;
-
-  final List<String> _fileTypes = ['.pdf', '.txt', '.py', '.js', '.dart'];
+  PlatformFile? _pickedFile;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -25,103 +31,88 @@ class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_selectedFileName == null) {
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: _allowedExtensions,
+    );
+    if (result == null) return;
+    setState(() => _pickedFile = result.files.single);
+  }
+
+  Future<void> _submit() async {
+    final file = _pickedFile;
+    if (file == null || file.path == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a file to upload')),
+        const SnackBar(content: Text('Please pick a file first')),
       );
       return;
     }
+    final studentId = ref.read(authProvider).studentProfile?.id;
+    if (studentId == null) return;
 
-    AppState().submitProject(
-      widget.course.id,
-      _selectedFileName!,
-      _selectedFileType,
-      _notesController.text,
-    );
+    setState(() => _submitting = true);
+    try {
+      final repo = ref.read(submissionRepositoryProvider);
+      final storagePath = await repo.uploadFile(
+        studentId: studentId,
+        courseId: widget.course.id,
+        file: File(file.path!),
+        fileName: file.name,
+      );
+      final ext = (file.extension ?? 'pdf').toLowerCase();
+      await repo.createSubmission(
+        studentId: studentId,
+        courseId: widget.course.id,
+        fileUrl: storagePath,
+        fileName: file.name,
+        fileType: '.$ext',
+        notes: _notesController.text.trim(),
+      );
 
-    setState(() => _submitted = true);
+      ref.invalidate(submissionForCourseProvider(widget.course.id));
+      if (!mounted) return;
+      setState(() => _submitting = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Submission failed: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final state = AppState();
-    final avgScore = state.averageQuizScore(widget.course.id);
-
-    if (_submitted) {
+    final online = ref.watch(isOnlineProvider);
+    if (!online) {
       return Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(flex: 2),
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.tertiaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.cloud_done_outlined,
-                    size: 52,
-                    color: theme.colorScheme.tertiary,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'Submission Received!',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Your project for "${widget.course.title}" has been submitted. A moderator will review and grade it soon.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      _ScoreRow(label: 'Quiz Average', value: '${avgScore.toStringAsFixed(1)} / 20'),
-                      const SizedBox(height: 8),
-                      _ScoreRow(label: 'Submission', value: 'Pending / 80'),
-                      const Divider(),
-                      _ScoreRow(label: 'Total', value: 'Pending / 100'),
-                    ],
-                  ),
-                ),
-                const Spacer(flex: 3),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Back to Course'),
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
-          ),
-        ),
+        appBar: AppBar(title: const Text('Final Submission')),
+        body: const _OfflineGate(),
       );
     }
 
+    final existingAsync = ref.watch(submissionForCourseProvider(widget.course.id));
+    return existingAsync.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Final Submission')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, _) => Scaffold(
+        appBar: AppBar(title: const Text('Final Submission')),
+        body: Center(child: Text('Error: $err')),
+      ),
+      data: (existing) {
+        if (existing != null) {
+          return _SubmittedView(course: widget.course, submission: existing);
+        }
+        return _buildForm(context);
+      },
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Final Submission')),
       body: SingleChildScrollView(
@@ -141,7 +132,7 @@ class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'This submission is worth 80 marks and will be graded by a moderator.',
+                      'Worth 80 marks. A moderator will review and grade your work.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onTertiaryContainer,
                       ),
@@ -151,73 +142,30 @@ class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            Text('Course', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text('Course',
+                style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
-            Text(widget.course.title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.score, size: 18, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Your quiz average: ${avgScore.toStringAsFixed(1)} / 20',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            Text(widget.course.title,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 24),
-            Text('Task', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text('Task',
+                style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
             Text(
               'Create a simple explanation of an AI use-case you see in your daily life. Describe how it works, what data it might use, and why it matters.',
               style: theme.textTheme.bodyLarge,
             ),
             const SizedBox(height: 28),
-
-            // File type selection
-            Text('File Type', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: _fileTypes.map((type) {
-                final isSelected = _selectedFileType == type;
-                return ChoiceChip(
-                  label: Text(type),
-                  selected: isSelected,
-                  onSelected: (val) {
-                    setState(() {
-                      _selectedFileType = type;
-                      if (_selectedFileName != null) {
-                        final name = _selectedFileName!.split('.').first;
-                        _selectedFileName = '$name$type';
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-
-            // File upload area
-            Text('Upload File', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text('Upload File',
+                style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 8),
             InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                setState(() {
-                  _selectedFileName = 'my_ai_project$_selectedFileType';
-                });
-              },
+              onTap: _submitting ? null : _pickFile,
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -231,29 +179,29 @@ class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
                 child: Column(
                   children: [
                     Icon(
-                      _selectedFileName != null
+                      _pickedFile != null
                           ? Icons.insert_drive_file
                           : Icons.cloud_upload_outlined,
                       size: 40,
-                      color: _selectedFileName != null
+                      color: _pickedFile != null
                           ? theme.colorScheme.primary
                           : theme.colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _selectedFileName ?? 'Tap to choose file',
+                      _pickedFile?.name ?? 'Tap to choose file',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: _selectedFileName != null
+                        color: _pickedFile != null
                             ? theme.colorScheme.primary
                             : theme.colorScheme.onSurfaceVariant,
-                        fontWeight: _selectedFileName != null
+                        fontWeight: _pickedFile != null
                             ? FontWeight.w600
                             : FontWeight.normal,
                       ),
                     ),
-                    if (_selectedFileName == null)
+                    if (_pickedFile == null)
                       Text(
-                        'Accepted: ${_fileTypes.join(", ")}',
+                        'Accepted: ${_allowedExtensions.map((e) => ".$e").join(", ")}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -263,11 +211,10 @@ class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Notes
             TextField(
               controller: _notesController,
               maxLines: 4,
+              enabled: !_submitting,
               decoration: const InputDecoration(
                 labelText: 'Notes (optional)',
                 hintText: 'Add any extra notes about your submission...',
@@ -276,13 +223,21 @@ class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
               ),
             ),
             const SizedBox(height: 32),
-
             SizedBox(
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                onPressed: _submit,
-                child: const Text('Submit Project'),
+                onPressed: _submitting ? null : _submit,
+                child: _submitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Submit Project'),
               ),
             ),
           ],
@@ -292,21 +247,131 @@ class _FinalSubmissionScreenState extends State<FinalSubmissionScreen> {
   }
 }
 
-class _ScoreRow extends StatelessWidget {
-  final String label;
-  final String value;
+class _SubmittedView extends StatelessWidget {
+  final Course course;
+  final Submission submission;
 
-  const _ScoreRow({required this.label, required this.value});
+  const _SubmittedView({required this.course, required this.submission});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        Text(value, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-      ],
+    final isGraded = submission.isGraded;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Spacer(flex: 2),
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: isGraded
+                      ? Colors.green.withValues(alpha: 0.12)
+                      : theme.colorScheme.tertiaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isGraded ? Icons.grading : Icons.cloud_done_outlined,
+                  size: 52,
+                  color: isGraded ? Colors.green : theme.colorScheme.tertiary,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                isGraded ? 'Graded!' : 'Submission Received!',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                isGraded
+                    ? 'Your project for "${course.title}" has been graded.'
+                    : 'Your project for "${course.title}" has been submitted. A moderator will review it soon.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (isGraded) ...[
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '${submission.scoreOutOf80} / 80',
+                        style: theme.textTheme.displaySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                      if (submission.moderatorFeedback != null &&
+                          submission.moderatorFeedback!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          submission.moderatorFeedback!,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              const Spacer(flex: 3),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Back to Course'),
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflineGate extends StatelessWidget {
+  const _OfflineGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.wifi_off, size: 64, color: theme.colorScheme.outline),
+            const SizedBox(height: 16),
+            Text('Connect to internet', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Submissions need internet so we can upload your file. Reconnect and try again!',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

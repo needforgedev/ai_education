@@ -1,32 +1,30 @@
 import 'package:flutter/material.dart';
-import '../mock/mock_data.dart';
-import '../mock/app_state.dart';
+import '../data/models/module.dart';
 import 'quiz_screen.dart';
 
 class QuizResultScreen extends StatelessWidget {
-  final MockModule module;
-  final int moduleIndex;
+  final CourseModule module;
   final int score;
   final int totalQuestions;
   final int correctAnswers;
   final bool isNewBest;
   final bool passed;
+  final int? previousBest;
 
   const QuizResultScreen({
     super.key,
     required this.module,
-    required this.moduleIndex,
     required this.score,
     required this.totalQuestions,
     required this.correctAnswers,
     required this.isNewBest,
     required this.passed,
+    this.previousBest,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bestScore = AppState().getBestScore(module.courseId, moduleIndex);
 
     return Scaffold(
       body: SafeArea(
@@ -90,22 +88,21 @@ class QuizResultScreen extends StatelessWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    if (bestScore != null && bestScore != score) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Best score: $bestScore / 20',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                    if (isNewBest && bestScore == score) ...[
+                    if (isNewBest) ...[
                       const SizedBox(height: 8),
                       Text(
                         'New best score!',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.green,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ] else if (previousBest != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Best score: $previousBest / 20',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -124,9 +121,7 @@ class QuizResultScreen extends StatelessWidget {
                 ),
               ] else ...[
                 Text(
-                  module.orderIndex < 10
-                      ? 'Module ${module.orderIndex + 1} is now unlocked.'
-                      : 'All modules complete! Final submission unlocked.',
+                  'Great job! The next module is unlocked.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -142,10 +137,7 @@ class QuizResultScreen extends StatelessWidget {
                     onPressed: () {
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (_) => QuizScreen(
-                            module: module,
-                            moduleIndex: moduleIndex,
-                          ),
+                          builder: (_) => QuizScreen(module: module),
                         ),
                       );
                     },
@@ -172,10 +164,7 @@ class QuizResultScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
-                        builder: (_) => QuizScreen(
-                          module: module,
-                          moduleIndex: moduleIndex,
-                        ),
+                        builder: (_) => QuizScreen(module: module),
                       ),
                     );
                   },

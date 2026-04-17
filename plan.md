@@ -1,7 +1,7 @@
 # AI Education Platform — Build Plan & Progress Tracker
 
-> **Last updated:** 2026-04-14
-> **Overall progress:** Phase 3 in progress (Steps 1-5 + 9 done + auth bug fixes + password change, next: Step 6)
+> **Last updated:** 2026-04-17
+> **Overall progress:** Phase 3 in progress (Steps 1-9 done for Grades 3-4 trial course, offline-first learning + offline auth persistence in place, next: Steps 10-13 — leaderboard, moderator, notifications, dashboard polish)
 
 ---
 
@@ -15,7 +15,31 @@
 | Routing | GoRouter (declarative, auth-guarded) |
 | File Uploads | Supabase Storage |
 | Realtime | Supabase Realtime (community feature) |
+| Local Cache | Hive (offline learning content — courses, modules, lesson blocks) |
 | Architecture | Feature-based folders (differs from spec's 4-layer recommendation — chosen for better scalability at this project size) |
+
+---
+
+## Offline Strategy (in-scope for MVP)
+
+> **Rule:** Reads work offline, writes require internet.
+
+| Feature | Offline? | Source |
+|---------|----------|--------|
+| Course list | Yes | Local cache (Hive) |
+| Module lesson content | Yes | Local cache (Hive) |
+| Module list + order | Yes | Local cache (Hive) |
+| Quiz (questions, submit attempt) | No | Supabase (online only) |
+| Final submission (file upload) | No | Supabase Storage (online only) |
+| Community (threads, replies) | No | Supabase (online only) |
+| Leaderboard | No | Supabase view (online only) |
+| Notifications | No | Supabase (online only) |
+| `lesson_viewed_at` / progress writes | No | Supabase (online only) |
+| Auth (login, register, password) | No | Supabase (online only) |
+
+**Sync model:** download-once. On login, fetch all courses + modules for the student's cohort into Hive. Re-sync on explicit pull-to-refresh or on next login. No background sync queue, no conflict resolution needed (cache is read-only).
+
+**UI requirement:** quiz, submission, and community screens must check connectivity and show a friendly "Connect to internet" message when offline.
 
 ---
 
@@ -90,10 +114,9 @@
 
 - [x] Seed 5 cohorts (Grades 3-4 through 11-12) — done via Table Editor
 - [x] Seed sample schools with registration codes — done via Table Editor
-- [ ] Seed courses per cohort (placeholder content from current mock data)
-- [ ] Seed modules per course (placeholder content)
-- [ ] Seed quiz questions per module (placeholder content)
-- [ ] Create `supabase/src/seed.ts` for repeatable seeding
+- [x] Create `supabase/src/seed.ts` for repeatable seeding (idempotent per cohort+title)
+- [x] Seed Grades 3-4 course "Introduction to AI" (5 modules, 50 quiz questions) — trial scope
+- [ ] Seed remaining cohorts (Grades 5-6 through 11-12) — post-trial
 
 ---
 
@@ -104,6 +127,8 @@
 - [x] Add `flutter_riverpod` to pubspec.yaml
 - [x] Add `go_router` to pubspec.yaml
 - [x] Add `file_picker` to pubspec.yaml
+- [x] Add `hive` + `hive_flutter` to pubspec.yaml (offline learning cache)
+- [x] Add `connectivity_plus` to pubspec.yaml (detect online/offline for quiz/submission/community gates)
 - [x] Run `flutter pub get`
 
 ### 2.2 App shell
@@ -182,35 +207,66 @@
 - [x] Add `schoolName` + `cohortName` to `AuthState` — fetched from DB via `getSchoolName`/`getCohortName`
 - [x] Student dashboard, community, leaderboard screens show real school/cohort names
 - [x] Moderator dashboard community link → new drill-down `ModeratorCommunityScreen` (schools → threads → replies)
+- [x] Router updated to pass `Course` + `CourseModule` via `extra` (replaces legacy MockCourse/MockModule types)
 
-### Step 6: Courses + Modules
-> `lib/data/repositories/` + `lib/features/courses/`
+### Step 6: Courses + Modules (offline-first learning) — DONE
+> `lib/data/repositories/` + `lib/core/cache/` + `lib/features/courses/`
+>
+> **Offline-first:** Course list + module list + lesson content_blocks work without internet. Progress writes (`lesson_viewed_at`) require internet — writes are online-only. Module progress cache falls back when offline so unlock state is preserved.
 
-- [ ] `course_repository.dart` — getCoursesForCohort(cohortId)
-- [ ] `module_repository.dart` — getModulesForCourse(courseId), getModuleProgress(studentId, moduleId)
-- [ ] `course_provider.dart` — FutureProvider for courses
-- [ ] `module_provider.dart` — FutureProvider for modules + progress
-- [ ] Migrate `course_list_screen.dart` — fetch from Supabase
-- [ ] Migrate `course_detail_screen.dart` — real module list + progress from module_progress table
-- [ ] Migrate `module_lesson_screen.dart` — content_blocks from DB, mark lesson_viewed_at on view
+#### 6.1 Local cache infrastructure
+- [x] Initialize Hive in `main.dart` (before runApp)
+- [x] Create `lib/core/cache/learning_cache.dart` — boxes: `courses_by_cohort`, `modules_by_course`, `module_progress_by_student_course`, `learning_meta`
+- [x] Create `lib/core/cache/learning_cache_provider.dart` — Riverpod provider
+- [x] Create `lib/core/connectivity/connectivity_provider.dart` — `isOnlineProvider` via `connectivity_plus`
+- [x] Create `lib/core/sync/learning_sync_service.dart` + provider — orchestrates sync
 
-### Step 7: Quizzes
+#### 6.2 Sync-on-login
+- [x] `student_home_screen.dart` triggers `syncCohort(cohortId)` on first render when cache is empty
+- [x] "Downloading your courses..." overlay during sync via `_SyncOverlay`
+- [x] Gracefully handles partial sync (returns null on failure, UI falls back to empty state)
+
+#### 6.3 Repositories (cache-first reads, online writes)
+- [x] `course_repository.dart` — getCoursesForCohort reads cache-first; fetchRemoteCoursesForCohort used by sync
+- [x] `module_repository.dart` — getModulesForCourse reads cache-first; markLessonViewed online-only
+- [x] `module_repository.dart` — getProgressForCourseModules caches to Hive on success, falls back to cache on offline (fixes module unlock offline)
+
+#### 6.4 Providers + screens
+- [x] `course_providers.dart` — `myCoursesProvider`, `modulesForCourseProvider`, `moduleProgressForCourseProvider`
+- [x] Migrate `course_list_screen.dart` — ConsumerWidget + pull-to-refresh + loading/empty/error states
+- [x] Migrate `course_detail_screen.dart` — ConsumerWidget, real module list, cohort progress from Supabase (cache fallback), unlock via `quiz_passed_at`
+- [x] Migrate `module_lesson_screen.dart` — content_blocks from cache; `lesson_viewed_at` written to Supabase only if online
+
+#### 6.5 Offline auth persistence (post-Step 6)
+- [x] Create `lib/core/cache/user_cache.dart` — caches userId + role + studentProfile + schoolName + cohortName
+- [x] Update `auth_provider.dart` — cold start hydrates from Hive instantly; background refresh from Supabase when online; clears cache on signOut
+- [x] Returning user opens app offline → routed straight to dashboard (Supabase session + app-level user state both persisted)
+
+### Step 7: Quizzes (online only) — DONE
 > `lib/data/repositories/quiz_repository.dart` + `lib/features/quizzes/`
+>
+> **Online-only:** Quiz questions and attempts are never cached. Screen gates entry on connectivity.
 
-- [ ] `quiz_repository.dart` — getQuestionsForModule, submitAttempt, getBestScore
-- [ ] `quiz_provider.dart` — quiz state management
-- [ ] Migrate `quiz_screen.dart` — fetch questions from DB, submit to quiz_attempts
-- [ ] Migrate `quiz_result_screen.dart` — show score, update module_progress (quiz_passed_at, best_quiz_score, completed_at), unlock next module
+- [x] `quiz_repository.dart` — getQuestionsForModule, submitAttempt (inserts quiz_attempt + upserts module_progress: best score, quiz_passed_at, completed_at); returns `QuizSubmitResult` with isNewBest / previousBest
+- [x] `quiz_providers.dart` — `quizQuestionsProvider` (FutureProvider.family)
+- [x] Migrate `quiz_screen.dart` — ConsumerWidget, fetches questions online, connectivity gate with friendly offline message, submit button with loading state
+- [x] Migrate `quiz_result_screen.dart` — score display, new-best banner, unlock messaging, retake flow
+- [x] Fix race condition: quiz submission always guarantees `lesson_viewed_at` is set (defaults to now), eliminating dependency on fire-and-forget markLessonViewed
+- [x] Fix invalidation: quiz_screen invalidates `moduleProgressForCourseProvider` immediately after successful submit (replaces unreliable invalidate-after-push pattern in course_detail)
 
-### Step 8: Submissions
+### Step 8: Submissions (online only) — DONE
 > `lib/data/repositories/submission_repository.dart` + `lib/features/submissions/`
+>
+> **Online-only:** File uploads require internet. Screen gates entry on connectivity.
 
-- [ ] `submission_repository.dart` — uploadFile (Storage), createSubmission, getSubmission
-- [ ] `submission_provider.dart`
-- [ ] Migrate `final_submission_screen.dart` — file picker + upload to Supabase Storage + notes field
+- [x] `submission_repository.dart` — uploadFile to `{studentId}/{courseId}/{filename}` in Supabase Storage, createSubmission, getSubmission
+- [x] `submission_providers.dart` — `submissionRepositoryProvider`, `submissionForCourseProvider`
+- [x] Migrate `final_submission_screen.dart` — real `file_picker` (pdf/txt/py/js/dart), upload to Storage, notes field, offline gate, "already submitted" view with grade display
 
-### Step 9: Community
+### Step 9: Community (online only)
 > `lib/data/repositories/community_repository.dart` + `lib/features/community/`
+>
+> **Online-only:** Threads, replies, and realtime updates require internet.
 
 - [x] `community_repository.dart` — getThreads (school-scoped), getAllThreads (moderator), getSchoolsList, createThread, addReply, getReplies
 - [x] `community_provider.dart` — AsyncNotifier with Supabase Realtime subscription for new threads
@@ -219,9 +275,12 @@
 - [x] Fix `CommunityThread.fromJson` crash on aggregate count data
 - [x] `AuthState` extended with `schoolName` + `cohortName` (fetched from DB on login)
 - [x] Community + Leaderboard + Dashboard screens show real school/cohort names from auth provider
+- [ ] Add connectivity gate to community screens — show "Connect to internet" when offline (retroactive, after Step 6 connectivity provider lands)
 
-### Step 10: Leaderboard
+### Step 10: Leaderboard (online only)
 > `lib/data/repositories/leaderboard_repository.dart` + `lib/features/leaderboard/`
+>
+> **Online-only:** Rankings require server-side aggregation.
 
 - [ ] `leaderboard_repository.dart` — getLeaderboard with filters (course, cohort, school, overall)
 - [ ] `leaderboard_provider.dart`
@@ -390,15 +449,15 @@ The app determines the role at login by checking if the user's `id` exists in th
 | # | Test | How to verify | Status |
 |---|------|---------------|--------|
 | 1 | Schema applied | All 14 tables visible in Supabase dashboard | [x] |
-| 2 | Seed data | Query `courses` table — rows present | [ ] |
+| 2 | Seed data | Query `courses` table — Grades 3-4 "Introduction to AI" present with 5 modules + 50 questions | [x] |
 | 3 | Student registration | School code -> register -> row in `students` + `auth.users` | [x] |
 | 4 | Student login | Login -> dashboard with real name | [x] |
-| 5 | Course listing | Courses filtered by student's cohort | [ ] |
-| 6 | Lesson viewed | Open module -> `lesson_viewed_at` set in module_progress | [ ] |
-| 7 | Quiz submission | Score in `quiz_attempts`, best score in module_progress | [ ] |
-| 8 | Module completion | Lesson viewed + quiz passed -> `completed_at` set, next unlocks | [ ] |
+| 5 | Course listing | Courses filtered by student's cohort (cache-first) | [x] |
+| 6 | Lesson viewed | Open module -> `lesson_viewed_at` set in module_progress (online) | [x] |
+| 7 | Quiz submission | Score in `quiz_attempts`, best score in module_progress | [x] |
+| 8 | Module completion | Lesson viewed + quiz passed -> `completed_at` set, next unlocks | [x] |
 | 9 | Course score | Avg quiz (normalized/20) + submission (/80) = total /100 | [ ] |
-| 10 | File upload | Submission file in Storage bucket | [ ] |
+| 10 | File upload | Submission file in Storage bucket | [x] |
 | 11 | Moderator grading | Grade -> student sees score + notification | [ ] |
 | 12 | Community isolation | School A can't see School B threads | [x] |
 | 13 | Leaderboard | Rankings match course_progress view | [ ] |
@@ -411,6 +470,17 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 20 | Community replies | Student can reply to thread, reply saved in Supabase | [x] |
 | 21 | Moderator community | Moderator sees schools list → school threads → can reply | [x] |
 | 22 | School/cohort names | Dashboard, community, leaderboard show real names | [x] |
+| 23 | Offline course list | Airplane mode after login → course list still loads from cache | [ ] |
+| 24 | Offline lesson | Airplane mode → open module lesson → content renders from cache | [ ] |
+| 25 | Offline quiz blocked | Airplane mode → tap Start Quiz → friendly "Connect to internet" message | [ ] |
+| 26 | Offline submission blocked | Airplane mode → final submission → blocked with message | [ ] |
+| 27 | Offline community blocked | Airplane mode → community → blocked with message | [ ] |
+| 28 | Sync on login | Fresh login → Hive populated with all cohort courses + modules | [x] |
+| 29 | Manual re-sync | Pull-to-refresh on course list → Hive re-populated | [x] |
+| 30 | Offline cold start | Kill app while logged in, airplane mode, reopen → lands on dashboard (no welcome) | [ ] |
+| 31 | Offline module unlock | Pass quiz online → go offline → next module still unlocked in course detail | [ ] |
+| 32 | Completion race | Take quiz immediately after viewing lesson → `completed_at` set correctly on first submit | [ ] |
+| 33 | Invalidation after quiz | Pass quiz → pop to course detail → module shows "Done" without reopening app | [ ] |
 
 ---
 
@@ -420,11 +490,18 @@ The app determines the role at login by checking if the user's `id` exists in th
 |------|------|--------|
 | 2026-04-13 | Need DATABASE_URL in `supabase/.env` to run migrations | DONE |
 | 2026-04-13 | Curriculum content is placeholder — final content authored separately | NOTED |
-| 2026-04-13 | Offline caching (spec S19) deferred to post-MVP | NOTED |
+| 2026-04-17 | Offline-first learning brought IN-SCOPE for MVP — course/module content cached via Hive; quiz/submission/community remain online-only | DECISION |
 | 2026-04-14 | Supabase setup complete (tables, RLS, storage, auth, cohorts, schools, moderator) | DONE |
 | 2026-04-14 | Student registration + login + logout working end-to-end with Supabase | DONE |
 | 2026-04-14 | Moderator login + logout working end-to-end with Supabase | DONE |
 | 2026-04-14 | Password change available for both students and moderators | DONE |
-| 2026-04-14 | Courses/modules/quizzes still use mock data — need seed data or Steps 6-7 | OPEN |
+| 2026-04-14 | Courses/modules/quizzes still use mock data — need seed data or Steps 6-7 | DONE (2026-04-17) |
 | 2026-04-14 | Community fully migrated to Supabase (student + moderator views) | DONE |
 | 2026-04-14 | School/cohort names populated from DB on login | DONE |
+| 2026-04-17 | Grades 3-4 trial course seeded (Introduction to AI, 5 modules, 50 questions) via `supabase/src/seed.ts` | DONE |
+| 2026-04-17 | Steps 6-8 complete: offline course/module cache, quiz flow, submission flow | DONE |
+| 2026-04-17 | Offline auth persistence: cached profile/role/school/cohort in Hive → app opens to dashboard offline | DONE |
+| 2026-04-17 | Module progress cached in Hive → module unlock state preserved offline | DONE |
+| 2026-04-17 | Fixed race: quiz submit always sets `lesson_viewed_at` → `completed_at` reliably set | DONE |
+| 2026-04-17 | Fixed invalidation: quiz_screen invalidates progress provider after submit → UI updates without reopen | DONE |
+| 2026-04-17 | Leaderboard, moderator grading, notifications, dashboard polish still use mock data | OPEN |

@@ -52,3 +52,4 @@ supabase/.env
 supabase/node_modules/
 supabase/dist/
 sample_seed.json
+docs/course_content_guide.md

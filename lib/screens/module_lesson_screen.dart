@@ -1,49 +1,48 @@
 import 'package:flutter/material.dart';
-import '../mock/mock_data.dart';
-import '../mock/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/connectivity/connectivity_provider.dart';
+import '../core/sync/learning_sync_provider.dart';
+import '../data/models/module.dart';
+import '../features/auth/providers/auth_provider.dart';
 import 'quiz_screen.dart';
 
-class ModuleLessonScreen extends StatefulWidget {
-  final MockModule module;
-  final int moduleIndex;
+class ModuleLessonScreen extends ConsumerStatefulWidget {
+  final CourseModule module;
 
-  const ModuleLessonScreen({
-    super.key,
-    required this.module,
-    required this.moduleIndex,
-  });
+  const ModuleLessonScreen({super.key, required this.module});
 
   @override
-  State<ModuleLessonScreen> createState() => _ModuleLessonScreenState();
+  ConsumerState<ModuleLessonScreen> createState() => _ModuleLessonScreenState();
 }
 
-class _ModuleLessonScreenState extends State<ModuleLessonScreen> {
+class _ModuleLessonScreenState extends ConsumerState<ModuleLessonScreen> {
   int _currentPage = 0;
+  bool _lessonMarked = false;
+
+  void _maybeMarkLessonViewed() {
+    if (_lessonMarked) return;
+    final auth = ref.read(authProvider);
+    final studentId = auth.studentProfile?.id;
+    final online = ref.read(isOnlineProvider);
+    if (studentId == null || !online) return;
+
+    _lessonMarked = true;
+    final repo = ref.read(moduleRepositoryProvider);
+    repo.markLessonViewed(studentId: studentId, moduleId: widget.module.id);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final content = widget.module.lessonContent;
+    final content = widget.module.contentBlocks;
     final isLast = _currentPage == content.length - 1;
-    final bestScore = AppState().getBestScore(
-        widget.module.courseId, widget.moduleIndex);
+
+    if (isLast) _maybeMarkLessonViewed();
 
     return Scaffold(
       appBar: AppBar(
         title: Text('Module ${widget.module.orderIndex}'),
         actions: [
-          if (bestScore != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Chip(
-                label: Text('Best: $bestScore/20',
-                    style: const TextStyle(fontSize: 11)),
-                backgroundColor:
-                    Colors.green.withValues(alpha: 0.15),
-                side: BorderSide.none,
-                visualDensity: VisualDensity.compact,
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
@@ -84,16 +83,13 @@ class _ModuleLessonScreenState extends State<ModuleLessonScreen> {
                       child: Row(
                         children: [
                           Icon(Icons.flag_outlined,
-                              color: theme.colorScheme.primary,
-                              size: 20),
+                              color: theme.colorScheme.primary, size: 20),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               widget.module.objective,
-                              style:
-                                  theme.textTheme.bodyMedium?.copyWith(
-                                color: theme
-                                    .colorScheme.onPrimaryContainer,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -104,9 +100,7 @@ class _ModuleLessonScreenState extends State<ModuleLessonScreen> {
                   ],
                   Text(
                     content[_currentPage],
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      height: 1.7,
-                    ),
+                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.7),
                   ),
                 ],
               ),
@@ -119,9 +113,7 @@ class _ModuleLessonScreenState extends State<ModuleLessonScreen> {
                 if (_currentPage > 0)
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {
-                        setState(() => _currentPage--);
-                      },
+                      onPressed: () => setState(() => _currentPage--),
                       child: const Text('Previous'),
                     ),
                   ),
@@ -132,10 +124,7 @@ class _ModuleLessonScreenState extends State<ModuleLessonScreen> {
                       if (isLast) {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (_) => QuizScreen(
-                              module: widget.module,
-                              moduleIndex: widget.moduleIndex,
-                            ),
+                            builder: (_) => QuizScreen(module: widget.module),
                           ),
                         );
                       } else {
