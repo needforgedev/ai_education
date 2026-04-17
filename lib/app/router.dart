@@ -9,6 +9,7 @@ import '../features/auth/screens/cohort_confirmation_screen.dart';
 import '../data/models/cohort.dart';
 import '../data/models/course.dart';
 import '../data/models/module.dart';
+import '../data/models/submission_detail.dart';
 
 // Old screens still in lib/screens/ — will migrate to features/ in later steps
 import '../screens/student_home_screen.dart';
@@ -190,8 +191,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
           return SubmissionReviewScreen(
-            submission: extra['submission'],
-            course: extra['course'],
+            detail: extra['detail'] as SubmissionDetail,
           );
         },
       ),

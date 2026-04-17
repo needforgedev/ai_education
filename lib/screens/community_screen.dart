@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/connectivity/connectivity_provider.dart';
+import '../core/connectivity/offline_gate.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/community/providers/community_provider.dart';
 import '../data/models/community_thread.dart';
@@ -12,6 +14,16 @@ class CommunityScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final auth = ref.watch(authProvider);
+    final online = ref.watch(isOnlineProvider);
+
+    if (!online) {
+      return const SafeArea(
+        child: OfflineGate(
+          body: 'Community needs internet to show and post messages. Reconnect to chat with your classmates.',
+        ),
+      );
+    }
+
     final threadsAsync = ref.watch(communityThreadsProvider);
 
     return SafeArea(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/connectivity/connectivity_provider.dart';
+import '../core/connectivity/offline_gate.dart';
 import '../features/community/providers/community_provider.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../data/models/community_thread.dart';
@@ -12,6 +14,16 @@ class ModeratorCommunityScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final online = ref.watch(isOnlineProvider);
+    if (!online) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Community')),
+        body: const OfflineGate(
+          body: 'Moderating the community needs internet. Reconnect and try again.',
+        ),
+      );
+    }
+
     final schoolsAsync = ref.watch(schoolsListProvider);
 
     return Scaffold(

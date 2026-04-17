@@ -1,28 +1,31 @@
 import 'package:flutter/material.dart';
-import '../mock/mock_data.dart';
-import '../mock/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/connectivity/connectivity_provider.dart';
+import '../core/connectivity/offline_gate.dart';
+import '../data/models/submission_detail.dart';
+import '../features/auth/providers/auth_provider.dart';
+import '../features/moderator/providers/moderator_providers.dart';
 
-class SubmissionReviewScreen extends StatefulWidget {
-  final SubmissionState submission;
-  final MockCourse course;
+class SubmissionReviewScreen extends ConsumerStatefulWidget {
+  final SubmissionDetail detail;
 
-  const SubmissionReviewScreen({
-    super.key,
-    required this.submission,
-    required this.course,
-  });
+  const SubmissionReviewScreen({super.key, required this.detail});
 
   @override
-  State<SubmissionReviewScreen> createState() => _SubmissionReviewScreenState();
+  ConsumerState<SubmissionReviewScreen> createState() =>
+      _SubmissionReviewScreenState();
 }
 
-class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
+class _SubmissionReviewScreenState
+    extends ConsumerState<SubmissionReviewScreen> {
   final _understandingController = TextEditingController(text: '15');
   final _accuracyController = TextEditingController(text: '16');
   final _applicationController = TextEditingController(text: '14');
   final _clarityController = TextEditingController(text: '17');
   final _feedbackController = TextEditingController();
+  bool _submitting = false;
   bool _published = false;
+  int _publishedScore = 0;
 
   int get _totalScore {
     final u = int.tryParse(_understandingController.text) ?? 0;
@@ -32,15 +35,34 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
     return (u + a + ap + c).clamp(0, 80);
   }
 
-  void _publishScore() {
-    AppState().gradeSubmission(
-      widget.submission.courseId,
-      _totalScore,
-      _feedbackController.text.isNotEmpty
-          ? _feedbackController.text
-          : 'Reviewed by moderator.',
-    );
-    setState(() => _published = true);
+  Future<void> _publishScore() async {
+    final moderatorId = ref.read(authProvider).user?.id;
+    if (moderatorId == null) return;
+
+    setState(() => _submitting = true);
+    try {
+      await ref.read(moderatorRepositoryProvider).gradeSubmission(
+            submissionId: widget.detail.submission.id,
+            moderatorId: moderatorId,
+            studentUserId: widget.detail.submission.studentId,
+            courseId: widget.detail.course.id,
+            courseTitle: widget.detail.course.title,
+            scoreOutOf80: _totalScore,
+            feedback: _feedbackController.text.trim(),
+          );
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _published = true;
+        _publishedScore = _totalScore;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not publish: $e')),
+      );
+    }
   }
 
   @override
@@ -56,6 +78,16 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final online = ref.watch(isOnlineProvider);
+
+    if (!online) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Review Submission')),
+        body: const OfflineGate(
+          body: 'Grading needs internet so the student gets their score. Reconnect and try again.',
+        ),
+      );
+    }
 
     if (_published) {
       return Scaffold(
@@ -85,7 +117,7 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${widget.submission.studentName} received $_totalScore / 80 for ${widget.course.title}',
+                    '${widget.detail.studentName} received $_publishedScore / 80 for ${widget.detail.course.title}',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -104,6 +136,7 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
       );
     }
 
+    final submission = widget.detail.submission;
     return Scaffold(
       appBar: AppBar(title: const Text('Review Submission')),
       body: SingleChildScrollView(
@@ -111,7 +144,6 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Student info
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -120,45 +152,43 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
               ),
               child: Column(
                 children: [
-                  _InfoRow(label: 'Student', value: widget.submission.studentName),
+                  _InfoRow(label: 'Student', value: widget.detail.studentName),
                   const SizedBox(height: 8),
-                  _InfoRow(label: 'Course', value: widget.course.title),
+                  _InfoRow(label: 'Course', value: widget.detail.course.title),
                   const SizedBox(height: 8),
-                  _InfoRow(label: 'File', value: widget.submission.fileName),
-                  if (widget.submission.notes.isNotEmpty) ...[
+                  _InfoRow(label: 'File', value: submission.fileName),
+                  if (submission.notes.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    _InfoRow(label: 'Notes', value: widget.submission.notes),
+                    _InfoRow(label: 'Notes', value: submission.notes),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: 16),
-
-            // Mock file viewer
             Container(
               width: double.infinity,
-              height: 120,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 border: Border.all(
                     color: theme.colorScheme.outline.withValues(alpha: 0.3)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.insert_drive_file,
                       size: 36,
                       color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(height: 8),
                   Text(
-                    widget.submission.fileName,
+                    submission.fileName,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    '(Mock file preview)',
+                    'Stored at: ${submission.fileUrl}',
+                    textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -167,20 +197,28 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Rubric scoring
             Text(
               'Rubric (Total: 80)',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            _RubricField(label: 'Understanding', controller: _understandingController, onChanged: () => setState(() {})),
-            _RubricField(label: 'Accuracy', controller: _accuracyController, onChanged: () => setState(() {})),
-            _RubricField(label: 'Application', controller: _applicationController, onChanged: () => setState(() {})),
-            _RubricField(label: 'Clarity', controller: _clarityController, onChanged: () => setState(() {})),
-
+            _RubricField(
+                label: 'Understanding',
+                controller: _understandingController,
+                onChanged: () => setState(() {})),
+            _RubricField(
+                label: 'Accuracy',
+                controller: _accuracyController,
+                onChanged: () => setState(() {})),
+            _RubricField(
+                label: 'Application',
+                controller: _applicationController,
+                onChanged: () => setState(() {})),
+            _RubricField(
+                label: 'Clarity',
+                controller: _clarityController,
+                onChanged: () => setState(() {})),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(14),
@@ -205,11 +243,10 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Feedback
             TextField(
               controller: _feedbackController,
               maxLines: 3,
+              enabled: !_submitting,
               decoration: const InputDecoration(
                 labelText: 'Moderator Feedback (optional)',
                 hintText: 'Add feedback for the student...',
@@ -218,13 +255,21 @@ class _SubmissionReviewScreenState extends State<SubmissionReviewScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
             SizedBox(
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                onPressed: _publishScore,
-                child: const Text('Publish Score'),
+                onPressed: _submitting ? null : _publishScore,
+                child: _submitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Publish Score'),
               ),
             ),
           ],
