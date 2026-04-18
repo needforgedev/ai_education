@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 import '../../core/constants.dart';
 import '../../core/supabase/supabase_client.dart';
@@ -47,6 +48,23 @@ class SubmissionRepository {
         .single();
 
     return Submission.fromJson(result);
+  }
+
+  /// Generate a time-limited signed URL so the moderator can open/download
+  /// the uploaded file. Bucket is private; signed URLs respect storage policies.
+  /// Defaults to a 1-hour window.
+  Future<String> createSignedUrl({
+    required String storagePath,
+    Duration expiresIn = const Duration(hours: 1),
+  }) async {
+    return supabase.storage
+        .from(Buckets.submissions)
+        .createSignedUrl(storagePath, expiresIn.inSeconds);
+  }
+
+  /// Download the raw bytes of a submission file. Used by the in-app viewer.
+  Future<Uint8List> downloadBytes({required String storagePath}) async {
+    return supabase.storage.from(Buckets.submissions).download(storagePath);
   }
 
   /// Fetch the existing submission for this student+course (if any).

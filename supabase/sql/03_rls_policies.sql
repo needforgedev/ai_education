@@ -272,3 +272,9 @@ CREATE POLICY "Users can update own notifications (mark read)"
   TO authenticated
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
+
+-- Moderators need to create notifications for students they grade / reply to.
+CREATE POLICY "Moderators can create notifications"
+  ON notifications FOR INSERT
+  TO authenticated
+  WITH CHECK (is_moderator());

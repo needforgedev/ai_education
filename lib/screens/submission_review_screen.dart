@@ -5,6 +5,7 @@ import '../core/connectivity/offline_gate.dart';
 import '../data/models/submission_detail.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/moderator/providers/moderator_providers.dart';
+import '../features/submissions/screens/submission_file_viewer_screen.dart';
 
 class SubmissionReviewScreen extends ConsumerStatefulWidget {
   final SubmissionDetail detail;
@@ -18,14 +19,44 @@ class SubmissionReviewScreen extends ConsumerStatefulWidget {
 
 class _SubmissionReviewScreenState
     extends ConsumerState<SubmissionReviewScreen> {
-  final _understandingController = TextEditingController(text: '15');
-  final _accuracyController = TextEditingController(text: '16');
-  final _applicationController = TextEditingController(text: '14');
-  final _clarityController = TextEditingController(text: '17');
+  final _understandingController = TextEditingController();
+  final _accuracyController = TextEditingController();
+  final _applicationController = TextEditingController();
+  final _clarityController = TextEditingController();
   final _feedbackController = TextEditingController();
   bool _submitting = false;
   bool _published = false;
   int _publishedScore = 0;
+
+  void _openFile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SubmissionFileViewerScreen(
+          submission: widget.detail.submission,
+        ),
+      ),
+    );
+  }
+
+  String? _validateRubricField(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Required';
+    final n = int.tryParse(value);
+    if (n == null) return 'Must be a number';
+    if (n < 0 || n > 20) return '0–20';
+    return null;
+  }
+
+  bool get _rubricComplete {
+    for (final c in [
+      _understandingController,
+      _accuracyController,
+      _applicationController,
+      _clarityController,
+    ]) {
+      if (_validateRubricField(c.text) != null) return false;
+    }
+    return true;
+  }
 
   int get _totalScore {
     final u = int.tryParse(_understandingController.text) ?? 0;
@@ -186,11 +217,13 @@ class _SubmissionReviewScreenState
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(
-                    'Stored at: ${submission.fileUrl}',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      onPressed: _openFile,
+                      icon: const Icon(Icons.description_outlined, size: 18),
+                      label: const Text('Open submission file'),
                     ),
                   ),
                 ],
@@ -202,23 +235,38 @@ class _SubmissionReviewScreenState
               style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Grade each category out of 20.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 12),
             _RubricField(
-                label: 'Understanding',
-                controller: _understandingController,
-                onChanged: () => setState(() {})),
+              label: 'Understanding',
+              controller: _understandingController,
+              onChanged: () => setState(() {}),
+              errorText: _validateRubricField(_understandingController.text),
+            ),
             _RubricField(
-                label: 'Accuracy',
-                controller: _accuracyController,
-                onChanged: () => setState(() {})),
+              label: 'Accuracy',
+              controller: _accuracyController,
+              onChanged: () => setState(() {}),
+              errorText: _validateRubricField(_accuracyController.text),
+            ),
             _RubricField(
-                label: 'Application',
-                controller: _applicationController,
-                onChanged: () => setState(() {})),
+              label: 'Application',
+              controller: _applicationController,
+              onChanged: () => setState(() {}),
+              errorText: _validateRubricField(_applicationController.text),
+            ),
             _RubricField(
-                label: 'Clarity',
-                controller: _clarityController,
-                onChanged: () => setState(() {})),
+              label: 'Clarity',
+              controller: _clarityController,
+              onChanged: () => setState(() {}),
+              errorText: _validateRubricField(_clarityController.text),
+            ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(14),
@@ -259,7 +307,9 @@ class _SubmissionReviewScreenState
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                onPressed: _submitting ? null : _publishScore,
+                onPressed: (_submitting || !_rubricComplete)
+                    ? null
+                    : _publishScore,
                 child: _submitting
                     ? const SizedBox(
                         height: 20,
@@ -272,6 +322,16 @@ class _SubmissionReviewScreenState
                     : const Text('Publish Score'),
               ),
             ),
+            if (!_rubricComplete) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Enter a score (0–20) for every category to publish.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -311,32 +371,44 @@ class _RubricField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final VoidCallback onChanged;
+  final String? errorText;
 
   const _RubricField({
     required this.label,
     required this.controller,
     required this.onChanged,
+    this.errorText,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasValue = controller.text.trim().isNotEmpty;
+    final showError = hasValue && errorText != null;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label)),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(label),
+            ),
+          ),
           SizedBox(
-            width: 80,
+            width: 96,
             child: TextField(
               controller: controller,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 suffixText: '/ 20',
                 isDense: true,
-                border: OutlineInputBorder(),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 10),
+                errorText: showError ? errorText : null,
+                hintText: '0-20',
               ),
               onChanged: (_) => onChanged(),
             ),
