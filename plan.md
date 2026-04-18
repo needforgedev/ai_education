@@ -1,7 +1,7 @@
 # AI Education Platform — Build Plan & Progress Tracker
 
 > **Last updated:** 2026-04-17
-> **Overall progress:** Phase 3 in progress (Steps 1-9 done for Grades 3-4 trial course, offline-first learning + offline auth persistence in place, next: Steps 10-13 — leaderboard, moderator, notifications, dashboard polish)
+> **Overall progress:** Phase 3 in progress (Steps 1-9 + 11 done, Step 13 partially done for Grades 3-4 trial, offline-first learning + offline auth persistence in place, next: Steps 10 + 12 — leaderboard and notifications)
 
 ---
 
@@ -275,7 +275,7 @@
 - [x] Fix `CommunityThread.fromJson` crash on aggregate count data
 - [x] `AuthState` extended with `schoolName` + `cohortName` (fetched from DB on login)
 - [x] Community + Leaderboard + Dashboard screens show real school/cohort names from auth provider
-- [ ] Add connectivity gate to community screens — show "Connect to internet" when offline (retroactive, after Step 6 connectivity provider lands)
+- [x] Add connectivity gate to community screens — reusable `OfflineGate` widget in `lib/core/connectivity/`, applied to `community_screen.dart` + `moderator_community_screen.dart`
 
 ### Step 10: Leaderboard (online only)
 > `lib/data/repositories/leaderboard_repository.dart` + `lib/features/leaderboard/`
@@ -286,12 +286,18 @@
 - [ ] `leaderboard_provider.dart`
 - [ ] Migrate `leaderboard_screen.dart` — real ranked data from course_progress view, highlight current student
 
-### Step 11: Moderator
-> `lib/features/moderator/`
+### Step 11: Moderator — DONE
+> `lib/data/repositories/moderator_repository.dart` + `lib/features/moderator/`
+>
+> **Online-only:** All moderator operations hit Supabase live — no caching. Connectivity gate on dashboard, submission review, and community.
 
-- [ ] `moderator_provider.dart` — pending submissions count, open threads, active students
-- [ ] Migrate `moderator_dashboard_screen.dart` — real stats from DB, cohort/school filters
-- [ ] Migrate `submission_review_screen.dart` — grade + publish score to DB + trigger notification
+- [x] `lib/data/models/submission_detail.dart` — wraps `Submission` with joined `student.full_name` + `Course` from embedded PostgREST select
+- [x] `moderator_repository.dart` — `getAllSubmissions`, `getPendingSubmissions` (both with embedded `students(full_name), courses(*)` joins), `getOpenDoubtsCount` (threads with no replies), `gradeSubmission` (updates `final_submissions` + inserts `notifications` row for student)
+- [x] `moderator_providers.dart` — `allSubmissionsProvider`, `pendingSubmissionsProvider`, `openDoubtsCountProvider`, aggregated `moderatorStatsProvider`
+- [x] Migrate `moderator_dashboard_screen.dart` — real stats (pending/graded/open doubts), pull-to-refresh, offline gate, real submission list, navigates to review screen + invalidates on return
+- [x] Migrate `submission_review_screen.dart` — takes `SubmissionDetail`, publishes grade + feedback + `moderator_id` + `graded_at`, triggers `submission_graded` notification insert, offline gate, loading state
+- [x] Router updated — `submissionReview` route takes `detail: SubmissionDetail` (replaces legacy submission+course args)
+- [ ] Cohort/school filters on dashboard — deferred post-trial (only 1 course for Grades 3-4 right now)
 
 ### Step 12: Notifications
 > `lib/features/notifications/` (spec S18)
@@ -304,15 +310,15 @@
 - [ ] Notification list screen or bottom sheet
 - [ ] Trigger notifications: on submission graded, on moderator reply
 
-### Step 13: Settings + Student Dashboard
-> `lib/features/settings/` + `lib/features/student/`
+### Step 13: Settings + Student Dashboard — PARTIALLY DONE
+> `lib/features/student/providers/` + `lib/features/settings/`
 
-- [ ] `dashboard_provider.dart` — aggregate progress from course_progress view
-- [ ] Migrate `student_dashboard_screen.dart` — real progress, continue learning, notification bell
-- [ ] Migrate `student_home_screen.dart` — wire tabs to new feature screens
-- [x] Migrate `settings_screen.dart` — real logout via Supabase, profile from auth provider (done early for bug fix)
+- [x] `dashboard_provider.dart` — aggregates `myCoursesProvider` + `moduleProgressForCourseProvider` into `DashboardData` (stats + summaries + continue-learning pointer)
+- [x] Migrate `student_dashboard_screen.dart` — real courses, per-course progress bars, Continue Learning card opens next module, pull-to-refresh
+- [ ] Add notification bell icon (pending Step 12)
+- [ ] Migrate `student_home_screen.dart` — wire tabs to feature folders (currently reaches legacy `lib/screens/` paths; functional but part of Phase 4 cleanup)
+- [x] Migrate `settings_screen.dart` — real logout via Supabase, profile from auth provider
 - [x] Create `change_password_screen.dart` — Supabase `updateUser` for password change
-- [x] `student_dashboard_screen.dart` — reads real student name from auth provider (partially migrated)
 
 ---
 
@@ -458,7 +464,7 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 8 | Module completion | Lesson viewed + quiz passed -> `completed_at` set, next unlocks | [x] |
 | 9 | Course score | Avg quiz (normalized/20) + submission (/80) = total /100 | [ ] |
 | 10 | File upload | Submission file in Storage bucket | [x] |
-| 11 | Moderator grading | Grade -> student sees score + notification | [ ] |
+| 11 | Moderator grading | Grade -> `final_submissions.status=graded` + score + `notifications` row | [x] (implemented, end-to-end test pending) |
 | 12 | Community isolation | School A can't see School B threads | [x] |
 | 13 | Leaderboard | Rankings match course_progress view | [ ] |
 | 14 | Notifications | Submission graded + moderator reply trigger notifications | [ ] |
@@ -474,13 +480,18 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 24 | Offline lesson | Airplane mode → open module lesson → content renders from cache | [ ] |
 | 25 | Offline quiz blocked | Airplane mode → tap Start Quiz → friendly "Connect to internet" message | [ ] |
 | 26 | Offline submission blocked | Airplane mode → final submission → blocked with message | [ ] |
-| 27 | Offline community blocked | Airplane mode → community → blocked with message | [ ] |
+| 27 | Offline community blocked | Airplane mode → community → blocked with message | [x] (gate in place) |
 | 28 | Sync on login | Fresh login → Hive populated with all cohort courses + modules | [x] |
 | 29 | Manual re-sync | Pull-to-refresh on course list → Hive re-populated | [x] |
 | 30 | Offline cold start | Kill app while logged in, airplane mode, reopen → lands on dashboard (no welcome) | [ ] |
 | 31 | Offline module unlock | Pass quiz online → go offline → next module still unlocked in course detail | [ ] |
 | 32 | Completion race | Take quiz immediately after viewing lesson → `completed_at` set correctly on first submit | [ ] |
 | 33 | Invalidation after quiz | Pass quiz → pop to course detail → module shows "Done" without reopening app | [ ] |
+| 34 | Dashboard stats | "Your Progress" shows real counts + per-course progress bars (no phantom courses) | [ ] |
+| 35 | Module order | Course detail shows modules 1→5 in ascending order | [ ] |
+| 36 | Offline dashboard | Dashboard renders instantly from cache when offline (no network timeout) | [ ] |
+| 37 | Moderator offline gate | Moderator dashboard + review screen show OfflineGate when offline | [x] (gate in place) |
+| 38 | Submission grading notification | Graded submission → student sees score on final submission screen + notifications row exists | [ ] |
 
 ---
 
@@ -504,4 +515,9 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 2026-04-17 | Module progress cached in Hive → module unlock state preserved offline | DONE |
 | 2026-04-17 | Fixed race: quiz submit always sets `lesson_viewed_at` → `completed_at` reliably set | DONE |
 | 2026-04-17 | Fixed invalidation: quiz_screen invalidates progress provider after submit → UI updates without reopen | DONE |
-| 2026-04-17 | Leaderboard, moderator grading, notifications, dashboard polish still use mock data | OPEN |
+| 2026-04-17 | Leaderboard, moderator grading, notifications, dashboard polish still use mock data | PARTIAL (Steps 11 + dashboard polish now done; leaderboard + notifications remain) |
+| 2026-04-17 | Step 9 final task closed: reusable `OfflineGate` widget gates community + moderator community screens offline | DONE |
+| 2026-04-17 | Step 11 complete: moderator dashboard + submission review migrated to Supabase; grading inserts `notifications` row | DONE |
+| 2026-04-17 | Step 13 dashboard migrated: real `DashboardData` from Supabase, no more mock courses on student home | DONE (notification bell deferred to Step 12) |
+| 2026-04-17 | Fixed module order bug (`.order()` defaulted to descending) across all repos; bumped `LearningCache` schema to v2 to purge reversed caches on next launch | DONE |
+| 2026-04-17 | Offline UX: `moduleProgressForCourseProvider` short-circuits to cache when offline (no network timeout wait) via `preferCacheOnly` flag | DONE |
