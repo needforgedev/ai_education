@@ -98,6 +98,7 @@
 - [x] Create `is_moderator()` helper function (02_helper_functions.sql)
 - [x] All RLS policies applied (03_rls_policies.sql) — includes anon read on schools + cohorts for registration
 - [x] Storage policies applied (04_storage_policies.sql)
+- [x] **Fix:** Added missing INSERT policy on `notifications` (`06_fix_notifications_insert.sql`) — original 03 only had SELECT + UPDATE, blocking moderator grading writes with 42501. Also patched into 03 for fresh setups.
 
 ### 1.5 Supabase database views/functions
 
@@ -129,6 +130,8 @@
 - [x] Add `file_picker` to pubspec.yaml
 - [x] Add `hive` + `hive_flutter` to pubspec.yaml (offline learning cache)
 - [x] Add `connectivity_plus` to pubspec.yaml (detect online/offline for quiz/submission/community gates)
+- [x] Add `url_launcher` to pubspec.yaml (kept for potential future external opens; in-app viewer is now primary)
+- [x] Add `flutter_pdfview` + `path_provider` to pubspec.yaml (in-app PDF rendering for submission review)
 - [x] Run `flutter pub get`
 
 ### 2.2 App shell
@@ -260,6 +263,7 @@
 > **Online-only:** File uploads require internet. Screen gates entry on connectivity.
 
 - [x] `submission_repository.dart` — uploadFile to `{studentId}/{courseId}/{filename}` in Supabase Storage, createSubmission, getSubmission
+- [x] `submission_repository.dart` — `createSignedUrl(storagePath, expiresIn)` for time-limited access; `downloadBytes(storagePath)` for in-app viewer
 - [x] `submission_providers.dart` — `submissionRepositoryProvider`, `submissionForCourseProvider`
 - [x] Migrate `final_submission_screen.dart` — real `file_picker` (pdf/txt/py/js/dart), upload to Storage, notes field, offline gate, "already submitted" view with grade display
 
@@ -296,6 +300,8 @@
 - [x] `moderator_providers.dart` — `allSubmissionsProvider`, `pendingSubmissionsProvider`, `openDoubtsCountProvider`, aggregated `moderatorStatsProvider`
 - [x] Migrate `moderator_dashboard_screen.dart` — real stats (pending/graded/open doubts), pull-to-refresh, offline gate, real submission list, navigates to review screen + invalidates on return
 - [x] Migrate `submission_review_screen.dart` — takes `SubmissionDetail`, publishes grade + feedback + `moderator_id` + `graded_at`, triggers `submission_graded` notification insert, offline gate, loading state
+- [x] **In-app file viewer:** new `lib/features/submissions/screens/submission_file_viewer_screen.dart` — PDFs render inline via `flutter_pdfview` (downloaded bytes → temp file), text/code files (`.txt/.py/.js/.dart`) shown as monospace `SelectableText`. Replaces external URL launch.
+- [x] **Real grading:** rubric fields start empty (no pre-filled values); 0–20 validation per category; "Publish Score" disabled until all four scores valid
 - [x] Router updated — `submissionReview` route takes `detail: SubmissionDetail` (replaces legacy submission+course args)
 - [ ] Cohort/school filters on dashboard — deferred post-trial (only 1 course for Grades 3-4 right now)
 
@@ -464,7 +470,7 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 8 | Module completion | Lesson viewed + quiz passed -> `completed_at` set, next unlocks | [x] |
 | 9 | Course score | Avg quiz (normalized/20) + submission (/80) = total /100 | [ ] |
 | 10 | File upload | Submission file in Storage bucket | [x] |
-| 11 | Moderator grading | Grade -> `final_submissions.status=graded` + score + `notifications` row | [x] (implemented, end-to-end test pending) |
+| 11 | Moderator grading | Grade -> `final_submissions.status=graded` + score + `notifications` row | [x] (RLS fix applied via 06_fix_notifications_insert.sql; full flow verified) |
 | 12 | Community isolation | School A can't see School B threads | [x] |
 | 13 | Leaderboard | Rankings match course_progress view | [ ] |
 | 14 | Notifications | Submission graded + moderator reply trigger notifications | [ ] |
@@ -492,6 +498,9 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 36 | Offline dashboard | Dashboard renders instantly from cache when offline (no network timeout) | [ ] |
 | 37 | Moderator offline gate | Moderator dashboard + review screen show OfflineGate when offline | [x] (gate in place) |
 | 38 | Submission grading notification | Graded submission → student sees score on final submission screen + notifications row exists | [ ] |
+| 39 | In-app PDF viewer | Moderator taps "Open submission file" on a PDF → renders inline via flutter_pdfview | [ ] |
+| 40 | In-app text viewer | Moderator opens a `.py/.txt/.js/.dart` submission → contents render as selectable monospace text | [ ] |
+| 41 | Rubric validation | Publish disabled until all 4 categories have valid 0–20 scores; helper text explains why | [ ] |
 
 ---
 
@@ -521,3 +530,6 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 2026-04-17 | Step 13 dashboard migrated: real `DashboardData` from Supabase, no more mock courses on student home | DONE (notification bell deferred to Step 12) |
 | 2026-04-17 | Fixed module order bug (`.order()` defaulted to descending) across all repos; bumped `LearningCache` schema to v2 to purge reversed caches on next launch | DONE |
 | 2026-04-17 | Offline UX: `moduleProgressForCourseProvider` short-circuits to cache when offline (no network timeout wait) via `preferCacheOnly` flag | DONE |
+| 2026-04-17 | RLS bug fixed: notifications table had no INSERT policy → moderator grading 42501 errors. Added "Moderators can create notifications" policy (`06_fix_notifications_insert.sql` + patch in 03) | DONE |
+| 2026-04-17 | In-app file viewer for moderator: PDFs render via `flutter_pdfview`, text/code files shown as `SelectableText` (replaces external URL launch) | DONE |
+| 2026-04-17 | Real grading: rubric fields start empty, validate 0–20, "Publish Score" disabled until all four are valid | DONE |
