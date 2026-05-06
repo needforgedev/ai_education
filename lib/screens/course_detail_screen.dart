@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../app/theme.dart';
 import '../data/models/course.dart';
 import '../data/models/module.dart';
 import '../data/models/module_progress.dart';
@@ -18,7 +19,11 @@ class CourseDetailScreen extends ConsumerWidget {
     final progressAsync = ref.watch(moduleProgressForCourseProvider(course.id));
 
     return Scaffold(
-      appBar: AppBar(title: Text(course.title)),
+      backgroundColor: AppPalette.bg,
+      appBar: AppBar(
+        title: Text(course.title),
+        backgroundColor: AppPalette.bg,
+      ),
       body: modulesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
@@ -30,7 +35,8 @@ class CourseDetailScreen extends ConsumerWidget {
 
           final completedCount =
               progressMap.values.where((p) => p.isCompleted).length;
-          final allDone = completedCount == modules.length && modules.isNotEmpty;
+          final allDone =
+              completedCount == modules.length && modules.isNotEmpty;
 
           final scores = progressMap.values
               .where((p) => p.bestQuizScore != null)
@@ -40,136 +46,129 @@ class CourseDetailScreen extends ConsumerWidget {
               ? 0.0
               : scores.reduce((a, b) => a + b) / scores.length;
 
-          return Column(
-            children: [
-              _CourseHeader(
-                course: course,
-                moduleCount: modules.length,
-                completedCount: completedCount,
-                avgScore: avgScore,
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  itemCount: modules.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == modules.length) {
-                      return _FinalSubmissionTile(
-                        course: course,
-                        allModulesDone: allDone,
-                      );
-                    }
-
-                    final module = modules[index];
-                    final progress = progressMap[module.id];
-                    final isCompleted = progress?.isCompleted ?? false;
-                    final bestScore = progress?.bestQuizScore;
-                    final isUnlocked = _isModuleUnlocked(index, modules, progressMap);
-
-                    return _ModuleTile(
-                      module: module,
-                      isCompleted: isCompleted,
-                      isUnlocked: isUnlocked,
-                      bestScore: bestScore,
-                      onTap: isUnlocked
-                          ? () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ModuleLessonScreen(module: module),
-                                ),
-                              );
-                              // Progress is invalidated from inside quiz_screen
-                              // after a successful submission, so the UI updates
-                              // when the user returns here.
-                            }
-                          : null,
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CORE · ${modules.length} modules'.toUpperCase(),
+                  style: AppText.eyebrow(context, color: AppPalette.primary),
+                ),
+                const SizedBox(height: 4),
+                Text(course.title, style: Theme.of(context).textTheme.displaySmall),
+                const SizedBox(height: 16),
+                _ProgressCard(
+                  completed: completedCount,
+                  total: modules.length,
+                  avgScore: avgScore,
+                ),
+                const SizedBox(height: 24),
+                Text('MODULES', style: AppText.eyebrow(context)),
+                const SizedBox(height: 12),
+                _ModuleList(
+                  modules: modules,
+                  progressMap: progressMap,
+                  onTapModule: (module) async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ModuleLessonScreen(module: module),
+                      ),
                     );
+                    ref.invalidate(
+                        moduleProgressForCourseProvider(course.id));
                   },
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                _FinalSubmissionTile(
+                  course: course,
+                  allModulesDone: allDone,
+                ),
+              ],
+            ),
           );
         },
       ),
     );
   }
-
-  bool _isModuleUnlocked(
-    int index,
-    List<CourseModule> modules,
-    Map<String, ModuleProgress> progressMap,
-  ) {
-    if (index == 0) return true;
-    final prev = modules[index - 1];
-    return progressMap[prev.id]?.isQuizPassed ?? false;
-  }
 }
 
-class _CourseHeader extends StatelessWidget {
-  final Course course;
-  final int moduleCount;
-  final int completedCount;
+class _ProgressCard extends StatelessWidget {
+  final int completed;
+  final int total;
   final double avgScore;
 
-  const _CourseHeader({
-    required this.course,
-    required this.moduleCount,
-    required this.completedCount,
+  const _ProgressCard({
+    required this.completed,
+    required this.total,
     required this.avgScore,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ratio = moduleCount == 0 ? 0.0 : completedCount / moduleCount;
+    final ratio = total == 0 ? 0.0 : completed / total;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      color: theme.colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            course.description,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          LinearProgressIndicator(
-            value: ratio,
-            minHeight: 6,
-            borderRadius: BorderRadius.circular(3),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '$completedCount / $moduleCount modules completed',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _ScoreChip(
-                label: 'Quiz Avg',
-                value: avgScore > 0 ? '${avgScore.toStringAsFixed(1)}/20' : '--',
-                color: theme.colorScheme.primary,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('PROGRESS', style: AppText.eyebrow(context)),
+                  const SizedBox(height: 4),
+                  RichText(
+                    text: TextSpan(
+                      style: theme.textTheme.displaySmall,
+                      children: [
+                        TextSpan(text: '$completed'),
+                        TextSpan(
+                          text: '/$total',
+                          style: theme.textTheme.displaySmall?.copyWith(
+                            color: AppPalette.textSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              _ScoreChip(
-                label: 'Submission',
-                value: '/80',
-                color: theme.colorScheme.tertiary,
-              ),
-              const SizedBox(width: 12),
-              _ScoreChip(
-                label: 'Total',
-                value: '/100',
-                color: theme.colorScheme.secondary,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('AVG SCORE', style: AppText.eyebrow(context)),
+                  const SizedBox(height: 4),
+                  Text(
+                    avgScore > 0 ? avgScore.toStringAsFixed(0) : '—',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: AppPalette.primary,
+                    ),
+                  ),
+                ],
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 4,
+              backgroundColor: AppPalette.border,
+              valueColor:
+                  const AlwaysStoppedAnimation(AppPalette.primary),
+            ),
           ),
         ],
       ),
@@ -177,107 +176,154 @@ class _CourseHeader extends StatelessWidget {
   }
 }
 
-class _ModuleTile extends StatelessWidget {
-  final CourseModule module;
-  final bool isCompleted;
-  final bool isUnlocked;
-  final int? bestScore;
-  final VoidCallback? onTap;
+class _ModuleList extends StatelessWidget {
+  final List<CourseModule> modules;
+  final Map<String, ModuleProgress> progressMap;
+  final void Function(CourseModule module) onTapModule;
 
-  const _ModuleTile({
-    required this.module,
-    required this.isCompleted,
-    required this.isUnlocked,
-    required this.bestScore,
-    required this.onTap,
+  const _ModuleList({
+    required this.modules,
+    required this.progressMap,
+    required this.onTapModule,
   });
+
+  bool _isUnlocked(int index) {
+    if (index == 0) return true;
+    final prev = modules[index - 1];
+    return progressMap[prev.id]?.isQuizPassed ?? false;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: ListTile(
-        leading: CircleAvatar(
-          radius: 18,
-          backgroundColor: isCompleted
-              ? Colors.green
-              : isUnlocked
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.surfaceContainerHighest,
-          child: isCompleted
-              ? const Icon(Icons.check, color: Colors.white, size: 18)
-              : Text(
-                  '${module.orderIndex}',
-                  style: TextStyle(
-                    color: isUnlocked
-                        ? theme.colorScheme.onPrimary
-                        : theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-        ),
-        title: Text(
-          module.title,
-          style: TextStyle(
-            fontWeight: FontWeight.w500,
-            color: isUnlocked
-                ? null
-                : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-          ),
-        ),
-        subtitle: bestScore != null
-            ? Text(
-                'Best score: $bestScore/20',
-                style:
-                    theme.textTheme.bodySmall?.copyWith(color: Colors.green),
-              )
-            : Text(
-                module.objective,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
-              ),
-        trailing: isCompleted
-            ? _StatusBadge(label: 'Done', color: Colors.green)
-            : isUnlocked
-                ? _StatusBadge(
-                    label: 'Ready',
-                    color: theme.colorScheme.primary,
-                  )
-                : Icon(
-                    Icons.lock_outline,
-                    size: 18,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withValues(alpha: 0.5),
-                  ),
-        onTap: onTap,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < modules.length; i++) ...[
+            _ModuleRow(
+              module: modules[i],
+              progress: progressMap[modules[i].id],
+              unlocked: _isUnlocked(i),
+              onTap: () => onTapModule(modules[i]),
+            ),
+            if (i < modules.length - 1)
+              const Divider(height: 1, color: AppPalette.border),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _StatusBadge({required this.label, required this.color});
+enum _ModuleStatus { done, current, locked }
+
+class _ModuleRow extends StatelessWidget {
+  final CourseModule module;
+  final ModuleProgress? progress;
+  final bool unlocked;
+  final VoidCallback onTap;
+
+  const _ModuleRow({
+    required this.module,
+    required this.progress,
+    required this.unlocked,
+    required this.onTap,
+  });
+
+  _ModuleStatus get _status {
+    if (progress?.isCompleted ?? false) return _ModuleStatus.done;
+    if (unlocked) return _ModuleStatus.current;
+    return _ModuleStatus.locked;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+    final theme = Theme.of(context);
+    final status = _status;
+    final bestScore = progress?.bestQuizScore;
+
+    final circleColor = switch (status) {
+      _ModuleStatus.done => AppPalette.primary,
+      _ModuleStatus.current => AppPalette.cyan,
+      _ModuleStatus.locked => AppPalette.border,
+    };
+
+    final circleChild = switch (status) {
+      _ModuleStatus.done =>
+        const Icon(Icons.check, size: 14, color: Colors.white),
+      _ModuleStatus.current => Text(
+          '${module.orderIndex}',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      _ModuleStatus.locked =>
+        const Icon(Icons.lock_outline, size: 12, color: AppPalette.textSoft),
+    };
+
+    return InkWell(
+      onTap: status == _ModuleStatus.locked ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: circleColor,
+                shape: BoxShape.circle,
+              ),
+              child: circleChild,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Module ${module.orderIndex}',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: AppPalette.textSoft),
+                  ),
+                  Text(
+                    module.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: status == _ModuleStatus.locked
+                          ? AppPalette.textSoft
+                          : null,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (status == _ModuleStatus.done && bestScore != null)
+              Text(
+                '$bestScore/20',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: AppPalette.primary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            if (status == _ModuleStatus.current)
+              Text(
+                'NOW',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppPalette.cyan,
+                  letterSpacing: 1.0,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -297,82 +343,60 @@ class _FinalSubmissionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Card(
-        elevation: 0,
-        color: allModulesDone
-            ? theme.colorScheme.tertiaryContainer
-            : theme.colorScheme.surfaceContainerLow,
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: allModulesDone
-                ? theme.colorScheme.tertiary
-                : theme.colorScheme.surfaceContainerHighest,
-            child: Icon(
-              Icons.assignment_outlined,
-              color: allModulesDone
-                  ? Colors.white
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
+    return InkWell(
+      onTap: allModulesDone
+          ? () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => FinalSubmissionScreen(course: course),
+                ),
+              );
+            }
+          : null,
+      borderRadius: BorderRadius.circular(AppRadii.button),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: allModulesDone ? AppPalette.ink : AppPalette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.button),
+          border: Border.all(
+            color: allModulesDone ? AppPalette.ink : AppPalette.border,
           ),
-          title: const Text(
-            'Final Submission',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            allModulesDone
-                ? '80 marks — ready to submit'
-                : '80 marks — complete all modules first',
-          ),
-          trailing:
-              allModulesDone ? const Icon(Icons.chevron_right) : null,
-          onTap: allModulesDone
-              ? () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => FinalSubmissionScreen(course: course),
-                    ),
-                  );
-                }
-              : null,
         ),
-      ),
-    );
-  }
-}
-
-class _ScoreChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-
-  const _ScoreChip({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
-              fontSize: 14,
+        child: Row(
+          children: [
+            Icon(
+              Icons.assignment_outlined,
+              color: allModulesDone ? Colors.white : AppPalette.textSoft,
             ),
-          ),
-          Text(label, style: TextStyle(fontSize: 10, color: color)),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Final project',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: allModulesDone ? Colors.white : AppPalette.text,
+                    ),
+                  ),
+                  Text(
+                    allModulesDone
+                        ? '80 marks · ready to submit'
+                        : 'Unlocks at 100%',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: allModulesDone
+                          ? Colors.white.withValues(alpha: 0.7)
+                          : AppPalette.textSoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (allModulesDone)
+              const Icon(Icons.arrow_forward, color: Colors.white),
+          ],
+        ),
       ),
     );
   }

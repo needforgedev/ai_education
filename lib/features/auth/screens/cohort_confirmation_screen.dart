@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../data/models/cohort.dart';
 import '../../../app/router.dart';
+import '../../../app/theme.dart';
+import '../../../data/models/cohort.dart';
 
 class CohortConfirmationScreen extends StatelessWidget {
   final String studentName;
@@ -24,67 +25,61 @@ class CohortConfirmationScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.fromLTRB(28, 60, 28, 32),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Spacer(flex: 2),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.tertiaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle_outline,
-                  size: 56,
-                  color: theme.colorScheme.tertiary,
-                ),
-              ),
-              const SizedBox(height: 28),
               Text(
-                'Welcome, $studentName!',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
+                'COHORT ASSIGNED',
+                style: AppText.eyebrow(context, color: AppPalette.primary),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              Text(
+                "You're in\n${cohort.name}",
+                style: theme.textTheme.displayMedium,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Grade $grade · $school',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppPalette.textSoft,
+                ),
+              ),
+              const SizedBox(height: 32),
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppPalette.ink,
+                  borderRadius: BorderRadius.circular(AppRadii.card + 2),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _InfoRow(label: 'School', value: school),
+                    Text(
+                      "WHAT'S AHEAD",
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppPalette.cyan,
+                        letterSpacing: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _CountRow(value: '5', label: 'AI courses'),
                     const SizedBox(height: 12),
-                    _InfoRow(label: 'Cohort', value: cohort.name),
+                    _CountRow(value: '50', label: 'modules total'),
                     const SizedBox(height: 12),
-                    _InfoRow(label: 'Grade', value: 'Grade $grade'),
+                    _CountRow(value: '5', label: 'final projects'),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Courses prepared for your level are ready.',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const Spacer(flex: 3),
+              const Spacer(),
               SizedBox(
                 width: double.infinity,
-                height: 52,
                 child: FilledButton(
-                  onPressed: () => context.go(AppRoutes.home),
-                  child: const Text('Go to Dashboard'),
+                  onPressed: () => context.go(AppRoutes.onboarding),
+                  child: const Text('Get started'),
                 ),
               ),
-              const Spacer(),
             ],
           ),
         ),
@@ -93,31 +88,33 @@ class CohortConfirmationScreen extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final String label;
+class _CountRow extends StatelessWidget {
   final String value;
+  final String label;
 
-  const _InfoRow({required this.label, required this.value});
+  const _CountRow({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Flexible(
+        SizedBox(
+          width: 64,
           child: Text(
             value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+            style: theme.textTheme.headlineLarge?.copyWith(
+              color: Colors.white,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
-            textAlign: TextAlign.end,
+          ),
+        ),
+        Text(
+          label,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: const Color(0xFFCBD5E1),
           ),
         ),
       ],

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../providers/auth_provider.dart';
 import '../../../app/router.dart';
+import '../../../app/theme.dart';
+import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   final bool isModerator;
@@ -49,7 +50,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (!mounted) return;
 
-      // Read the auth state after signIn completes (profile is loaded)
       final auth = ref.read(authProvider);
 
       if (widget.isModerator && !auth.isModerator) {
@@ -74,7 +74,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (!mounted) return;
 
-      // Navigate to appropriate dashboard
       if (auth.isModerator) {
         context.go(AppRoutes.moderatorDashboard);
       } else {
@@ -92,98 +91,137 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = widget.isModerator ? 'Moderator Login' : 'Student Login';
+    final headline = widget.isModerator ? 'Moderator sign in' : 'Welcome back';
+    final subtitle = widget.isModerator
+        ? 'Use your moderator credentials to grade and respond.'
+        : 'Sign in with the email you registered with.';
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Sign in with your email and password.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 32),
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.email],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.lock_outlined),
-                suffixIcon: IconButton(
-                  icon: Icon(_obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                ),
-              ),
-              obscureText: _obscurePassword,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _onLogin(),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error_outline,
-                        color: theme.colorScheme.error, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: TextStyle(color: theme.colorScheme.error),
+      backgroundColor: AppPalette.bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(28, 16, 28, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () => context.pop(),
+                borderRadius: BorderRadius.circular(AppRadii.button),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.arrow_back,
+                          size: 20, color: AppPalette.textSoft),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Back',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.textSoft,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ],
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton(
+              const SizedBox(height: 36),
+              Text(headline, style: theme.textTheme.displaySmall),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: AppPalette.textSoft),
+              ),
+              const SizedBox(height: 32),
+              Text('EMAIL', style: AppText.eyebrow(context)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.email],
+                decoration: const InputDecoration(
+                  hintText: 'jordan@school.edu',
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('PASSWORD', style: AppText.eyebrow(context)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _onLogin(),
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: AppPalette.textSoft,
+                    ),
+                    onPressed: () => setState(
+                        () => _obscurePassword = !_obscurePassword),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () {},
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Forgot password?'),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(AppRadii.input),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline,
+                          color: theme.colorScheme.error, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: theme.colorScheme.error),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const Spacer(),
+              FilledButton(
                 onPressed: _isLoading ? null : _onLogin,
                 child: _isLoading
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Text('Sign In'),
+                    : const Text('Sign in'),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

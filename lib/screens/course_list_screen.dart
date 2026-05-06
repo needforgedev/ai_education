@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../app/theme.dart';
 import '../core/sync/learning_sync_provider.dart';
 import '../data/models/course.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/courses/providers/course_providers.dart';
 import 'course_detail_screen.dart';
 
-class CourseListScreen extends ConsumerWidget {
+class CourseListScreen extends ConsumerStatefulWidget {
   const CourseListScreen({super.key});
+
+  @override
+  ConsumerState<CourseListScreen> createState() => _CourseListScreenState();
+}
+
+class _CourseListScreenState extends ConsumerState<CourseListScreen> {
+  String _filter = 'All';
+  static const _filters = ['All', 'In progress', 'Completed', 'Not started'];
 
   Future<void> _refresh(WidgetRef ref) async {
     final auth = ref.read(authProvider);
@@ -18,7 +28,7 @@ class CourseListScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final coursesAsync = ref.watch(myCoursesProvider);
 
@@ -27,11 +37,33 @@ class CourseListScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            child: Text(
-              'My Courses',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+            padding: const EdgeInsets.fromLTRB(24, 14, 24, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Library',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: AppPalette.textSoft)),
+                Text('Courses', style: theme.textTheme.displaySmall),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 14, 0, 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(right: 24),
+              child: Row(
+                children: [
+                  for (var i = 0; i < _filters.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    _FilterChip(
+                      label: _filters[i],
+                      selected: _filter == _filters[i],
+                      onTap: () => setState(() => _filter = _filters[i]),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -44,17 +76,19 @@ class CourseListScreen extends ConsumerWidget {
                 data: (courses) {
                   if (courses.isEmpty) return const _EmptyState();
                   return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
                     itemCount: courses.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final course = courses[index];
                       return _CourseCard(
                         course: course,
+                        accent: _accentForIndex(index),
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => CourseDetailScreen(course: course),
+                              builder: (_) =>
+                                  CourseDetailScreen(course: course),
                             ),
                           );
                         },
@@ -69,13 +103,67 @@ class CourseListScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Color _accentForIndex(int i) {
+    const palette = [
+      AppPalette.primary,
+      AppPalette.cyan,
+      AppPalette.ink,
+      AppPalette.primaryDeep,
+    ];
+    return palette[i % palette.length];
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.chip),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppPalette.ink : AppPalette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+          border: Border.all(
+            color: selected ? AppPalette.ink : AppPalette.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: selected ? Colors.white : AppPalette.text,
+            height: 1.4,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _CourseCard extends ConsumerWidget {
   final Course course;
+  final Color accent;
   final VoidCallback onTap;
 
-  const _CourseCard({required this.course, required this.onTap});
+  const _CourseCard({
+    required this.course,
+    required this.accent,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -87,80 +175,90 @@ class _CourseCard extends ConsumerWidget {
       orElse: () => 0,
     );
     final ratio = course.moduleCount == 0 ? 0.0 : completed / course.moduleCount;
+    final status = completed == 0
+        ? 'Not started'
+        : completed >= course.moduleCount
+            ? 'Completed'
+            : 'In progress';
 
-    return Card(
-      elevation: 0,
-      color: completed > 0
-          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-          : theme.colorScheme.surfaceContainerLow,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: completed > 0
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  course.icon,
-                  style: const TextStyle(fontSize: 24),
-                ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppPalette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          border: Border.all(color: AppPalette.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 96,
+              padding: const EdgeInsets.all(16),
+              color: accent,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        course.icon,
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                      Text(
+                        '${course.moduleCount} MODULES',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          letterSpacing: 1.0,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    course.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontSize: 22,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      course.title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        minHeight: 4,
+                        backgroundColor: AppPalette.border,
+                        valueColor: AlwaysStoppedAnimation(accent),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      course.description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    status,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.textSoft,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: LinearProgressIndicator(
-                            value: ratio,
-                            minHeight: 4,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$completed/${course.moduleCount}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -172,23 +270,24 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.all(40),
       children: [
         const SizedBox(height: 80),
         Icon(Icons.auto_stories_outlined,
-            size: 64, color: Theme.of(context).colorScheme.outline),
+            size: 64, color: AppPalette.textSoft),
         const SizedBox(height: 16),
         Text(
           'No courses yet',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleMedium,
+          style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 4),
         Text(
           'Pull down to download courses for your grade.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
+          style: theme.textTheme.bodySmall,
         ),
       ],
     );
@@ -201,6 +300,7 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -210,13 +310,13 @@ class _ErrorState extends StatelessWidget {
         Text(
           'Could not load courses',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleMedium,
+          style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 4),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
+          style: theme.textTheme.bodySmall,
         ),
       ],
     );

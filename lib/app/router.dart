@@ -21,6 +21,7 @@ import '../screens/final_submission_screen.dart';
 import '../screens/moderator_dashboard_screen.dart';
 import '../screens/submission_review_screen.dart';
 import '../screens/settings_screen.dart';
+import '../features/onboarding/screens/onboarding_screen.dart';
 
 /// Route path constants
 class AppRoutes {
@@ -30,6 +31,7 @@ class AppRoutes {
   static const moderatorLogin = '/moderator-login';
   static const register = '/register';
   static const cohortConfirmation = '/cohort-confirmation';
+  static const onboarding = '/onboarding';
 
   // Student
   static const home = '/';
@@ -79,7 +81,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           location == AppRoutes.login ||
           location == AppRoutes.moderatorLogin ||
           location == AppRoutes.register ||
-          location == AppRoutes.cohortConfirmation;
+          location == AppRoutes.cohortConfirmation ||
+          location == AppRoutes.onboarding;
 
       // Not authenticated — only allow public routes
       if (!isAuthenticated) {
@@ -112,6 +115,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.register,
         builder: (context, state) => const RegistrationScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.onboarding,
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: AppRoutes.cohortConfirmation,

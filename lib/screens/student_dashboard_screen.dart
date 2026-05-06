@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../app/theme.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/student/providers/dashboard_provider.dart';
 import 'course_detail_screen.dart';
@@ -16,6 +17,7 @@ class StudentDashboardScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final studentName = authState.studentProfile?.fullName ?? 'Student';
     final firstName = studentName.split(' ').first;
+    final initials = _initialsFor(studentName);
     final dashboardAsync = ref.watch(dashboardDataProvider);
 
     return SafeArea(
@@ -26,23 +28,19 @@ class StudentDashboardScreen extends ConsumerWidget {
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Header(
-                firstName: firstName,
-                cohortName: authState.cohortName,
-                schoolName: authState.schoolName,
-              ),
-              const SizedBox(height: 28),
+              _Header(firstName: firstName, initials: initials),
+              const SizedBox(height: 20),
               dashboardAsync.when(
                 loading: () => const Padding(
-                  padding: EdgeInsets.all(32),
+                  padding: EdgeInsets.symmetric(vertical: 48),
                   child: Center(child: CircularProgressIndicator()),
                 ),
                 error: (err, _) => Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text('Could not load your progress.\n$err',
                       style: theme.textTheme.bodyMedium),
                 ),
@@ -60,6 +58,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                       onNavigateToCourses?.call();
                     }
                   },
+                  onAllCourses: () => onNavigateToCourses?.call(),
                 ),
               ),
             ],
@@ -68,66 +67,77 @@ class StudentDashboardScreen extends ConsumerWidget {
       ),
     );
   }
+
+  String _initialsFor(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'S';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
+  }
 }
 
 class _Header extends StatelessWidget {
   final String firstName;
-  final String? cohortName;
-  final String? schoolName;
+  final String initials;
 
-  const _Header({
-    required this.firstName,
-    required this.cohortName,
-    required this.schoolName,
-  });
+  const _Header({required this.firstName, required this.initials});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        CircleAvatar(
-          radius: 24,
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text(
-            firstName[0].toUpperCase(),
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Hello, $firstName',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                '${cohortName ?? ""}  •  ${schoolName ?? ""}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text('Welcome back',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: AppPalette.textSoft)),
+              const SizedBox(height: 2),
+              Text(firstName, style: theme.textTheme.headlineMedium),
             ],
           ),
         ),
         IconButton(
           onPressed: () {
             Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const SettingsScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
             );
           },
-          icon: const Icon(Icons.settings_outlined),
+          icon: const Icon(Icons.notifications_outlined),
+          color: AppPalette.text,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            );
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppPalette.primary,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initials,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -137,104 +147,61 @@ class _Header extends StatelessWidget {
 class _DashboardBody extends StatelessWidget {
   final DashboardData data;
   final VoidCallback onContinue;
+  final VoidCallback onAllCourses;
 
-  const _DashboardBody({required this.data, required this.onContinue});
+  const _DashboardBody({
+    required this.data,
+    required this.onContinue,
+    required this.onAllCourses,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final continueCourse = data.continueCourse;
-    final continueText = continueCourse == null
-        ? 'No courses available yet'
-        : '${continueCourse.title} — Module ${data.continueNextModuleIndex} ready';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.primary,
-                theme.colorScheme.primary.withValues(alpha: 0.8),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Continue Learning',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                continueText,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 40,
-                child: FilledButton.tonal(
-                  onPressed: continueCourse == null ? null : onContinue,
-                  child: const Text('Open Course'),
-                ),
-              ),
-            ],
-          ),
+        _ContinueHero(
+          courseTitle: continueCourse?.title ?? 'No courses yet',
+          moduleIndex: data.continueNextModuleIndex,
+          completedCount: continueCourse == null
+              ? 0
+              : data.summaries
+                  .firstWhere(
+                    (s) => s.course.id == continueCourse.id,
+                    orElse: () =>
+                        CourseSummary(course: continueCourse, completedCount: 0),
+                  )
+                  .completedCount,
+          totalCount: continueCourse?.moduleCount ?? 0,
+          enabled: continueCourse != null,
+          onTap: onContinue,
+        ),
+        const SizedBox(height: 16),
+        _StatsRow(
+          inProgress: data.coursesInProgress,
+          completed: data.modulesCompleted,
+          done: data.coursesDone,
         ),
         const SizedBox(height: 24),
-        Text(
-          'Your Progress',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Expanded(
-              child: _StatCard(
-                icon: Icons.menu_book_outlined,
-                label: 'Courses\nIn Progress',
-                value: '${data.coursesInProgress}',
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                icon: Icons.check_circle_outline,
-                label: 'Modules\nCompleted',
-                value: '${data.modulesCompleted}',
-                color: Colors.green,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                icon: Icons.leaderboard_outlined,
-                label: 'Courses\nDone',
-                value: '${data.coursesDone}',
-                color: theme.colorScheme.secondary,
+            Text('THIS WEEK', style: AppText.eyebrow(context)),
+            InkWell(
+              onTap: onAllCourses,
+              child: Text(
+                'All courses →',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppPalette.primary,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'Course Progress',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
         ),
         const SizedBox(height: 12),
         if (data.summaries.isEmpty)
@@ -242,52 +209,197 @@ class _DashboardBody extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text(
               'No courses are available yet.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppPalette.textSoft,
+                  ),
             ),
           ),
-        ...data.summaries.map(
-          (summary) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerLow,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+        ...List.generate(data.summaries.length, (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _CourseRow(
+                summary: data.summaries[i],
+                accent: i.isEven ? AppPalette.primary : AppPalette.cyan,
+              ),
+            )),
+      ],
+    );
+  }
+}
+
+class _ContinueHero extends StatelessWidget {
+  final String courseTitle;
+  final int moduleIndex;
+  final int completedCount;
+  final int totalCount;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _ContinueHero({
+    required this.courseTitle,
+    required this.moduleIndex,
+    required this.completedCount,
+    required this.totalCount,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ratio = totalCount == 0 ? 0.0 : completedCount / totalCount;
+
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(AppRadii.card + 4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppPalette.ink,
+          borderRadius: BorderRadius.circular(AppRadii.card + 4),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -40,
+              top: -40,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppPalette.primary.withValues(alpha: 0.55),
+                      Colors.transparent,
+                    ],
+                    stops: const [0, 0.7],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    enabled
+                        ? 'CONTINUE · ${courseTitle.toUpperCase()}'
+                        : 'CONTINUE',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppPalette.cyan,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    enabled
+                        ? 'Module $moduleIndex'
+                        : 'Pull to download courses',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontSize: 22,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  if (enabled) ...[
+                    const SizedBox(height: 16),
                     Row(
                       children: [
-                        Text(summary.course.icon,
-                            style: const TextStyle(fontSize: 20)),
-                        const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            summary.course.title,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: ratio,
+                              minHeight: 4,
+                              backgroundColor:
+                                  Colors.white.withValues(alpha: 0.15),
+                              valueColor:
+                                  const AlwaysStoppedAnimation(AppPalette.cyan),
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 12),
                         Text(
-                          '${summary.completedCount}/${summary.course.moduleCount}',
+                          '$completedCount/$totalCount',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                            color: const Color(0xFFCBD5E1),
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: summary.ratio,
-                      minHeight: 5,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
                   ],
-                ),
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: enabled
+                          ? AppPalette.primary
+                          : AppPalette.primary.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(AppRadii.pill),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          enabled ? 'Resume →' : 'Open Course',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatsRow extends StatelessWidget {
+  final int inProgress;
+  final int completed;
+  final int done;
+
+  const _StatsRow({
+    required this.inProgress,
+    required this.completed,
+    required this.done,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            value: '$completed',
+            label: 'modules',
+            sub: 'completed',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatCard(
+            value: '$inProgress',
+            label: 'courses',
+            sub: 'in progress',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _StatCard(
+            value: '$done',
+            label: 'done',
+            sub: 'finished',
           ),
         ),
       ],
@@ -296,16 +408,14 @@ class _DashboardBody extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
   final String value;
-  final Color color;
+  final String label;
+  final String sub;
 
   const _StatCard({
-    required this.icon,
-    required this.label,
     required this.value,
-    required this.color,
+    required this.label,
+    required this.sub,
   });
 
   @override
@@ -314,26 +424,92 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 8),
           Text(
             value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: AppPalette.ink,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
+          Text(label,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: AppPalette.text)),
+          Text(sub,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: AppPalette.textSoft, fontSize: 10)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CourseRow extends StatelessWidget {
+  final CourseSummary summary;
+  final Color accent;
+  const _CourseRow({required this.summary, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final c = summary.course;
+    final pct = (summary.ratio * 100).round();
+    final statusLabel = summary.isDone
+        ? 'completed'
+        : summary.isInProgress
+            ? 'in progress'
+            : 'not started';
+    final nextModule = summary.completedCount + 1;
+    final subtitle = summary.isDone
+        ? 'all modules · $statusLabel'
+        : 'Module $nextModule · $statusLabel';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 44,
+            decoration: BoxDecoration(
+              color: summary.isDone ? Colors.green : accent,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(c.title, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: AppPalette.textSoft),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
-            label,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            '$pct%',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: AppPalette.text,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],

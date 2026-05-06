@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../app/theme.dart';
 import '../core/connectivity/connectivity_provider.dart';
 import '../data/models/module.dart';
 import '../data/models/quiz_question.dart';
@@ -134,96 +135,107 @@ class _QuizBodyState extends ConsumerState<_QuizBody> {
 
     return Column(
       children: [
-        LinearProgressIndicator(
-          value: (_currentQuestion + 1) / widget.questions.length,
-          minHeight: 3,
-        ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '${_currentQuestion + 1} / ${widget.questions.length}',
-              style: theme.textTheme.bodySmall,
-            ),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: (_currentQuestion + 1) / widget.questions.length,
+                    minHeight: 3,
+                    backgroundColor: AppPalette.border,
+                    valueColor:
+                        const AlwaysStoppedAnimation(AppPalette.primary),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '${_currentQuestion + 1}/${widget.questions.length}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppPalette.textSoft,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Question ${_currentQuestion + 1}',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
+                  'MODULE ${widget.module.orderIndex} · QUIZ',
+                  style: AppText.eyebrow(context, color: AppPalette.primary),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   question.question,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: theme.textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 ...List.generate(question.options.length, (index) {
                   final isSelected = _selectedOption == index;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: Material(
-                      color: isSelected
-                          ? theme.colorScheme.primaryContainer
-                          : theme.colorScheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => setState(() => _selectedOption = index),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : Colors.transparent,
-                              width: 2,
-                            ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadii.button),
+                      onTap: () => setState(() => _selectedOption = index),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppPalette.surface,
+                          borderRadius: BorderRadius.circular(AppRadii.button),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppPalette.primary
+                                : AppPalette.border,
+                            width: 1.5,
                           ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppPalette.primary
+                                    : AppPalette.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
                                   color: isSelected
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.surfaceContainerHighest,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  String.fromCharCode(65 + index),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                    color: isSelected
-                                        ? theme.colorScheme.onPrimary
-                                        : theme.colorScheme.onSurfaceVariant,
-                                  ),
+                                      ? AppPalette.primary
+                                      : AppPalette.border,
+                                  width: 1.5,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  question.options[index],
-                                  style: theme.textTheme.bodyLarge,
+                              alignment: Alignment.center,
+                              child: Text(
+                                String.fromCharCode(65 + index),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppPalette.text,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                question.options[index],
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: AppPalette.text,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

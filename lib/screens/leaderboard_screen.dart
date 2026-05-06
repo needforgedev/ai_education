@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../mock/mock_data.dart';
-import '../mock/app_state.dart';
+import '../app/theme.dart';
 import '../features/auth/providers/auth_provider.dart';
+import '../mock/mock_data.dart';
+
+enum _Scope { cohort, school, course, overall }
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
@@ -12,177 +14,219 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 }
 
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
-  String _filter = 'overall'; // overall, course-specific id
+  _Scope _scope = _Scope.cohort;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final state = AppState();
     final auth = ref.watch(authProvider);
-    final entries = state.getLeaderboard(
-      courseId: _filter == 'overall' ? null : _filter,
-    );
+    final school = auth.schoolName ?? 'Your School';
+    final cohort = auth.cohortName ?? 'Cohort';
+    final entries = mockLeaderboardEntries(school);
+    // Stub current rank — real value comes from course_progress view (Step 10)
+    const currentRank = 8;
+    const totalEntrants = 124;
+    const rankDelta = 3;
 
     return SafeArea(
-      child: Column(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Leaderboard',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: AppPalette.textSoft)),
+            const SizedBox(height: 2),
+            Text(_titleForScope(_scope, cohort, school),
+                style: theme.textTheme.displaySmall),
+            const SizedBox(height: 18),
+            _ScopeChips(
+              scope: _scope,
+              onChange: (s) => setState(() => _scope = s),
+            ),
+            const SizedBox(height: 20),
+            _YourRankCard(
+              rank: currentRank,
+              total: totalEntrants,
+              delta: rankDelta,
+            ),
+            const SizedBox(height: 24),
+            Text('TOP 3', style: AppText.eyebrow(context)),
+            const SizedBox(height: 12),
+            if (entries.length >= 3)
+              _Top3Row(entries: entries.take(3).toList()),
+            const SizedBox(height: 18),
+            _RankList(
+              entries: entries.skip(3).toList(),
+              currentUserName: auth.studentProfile?.fullName,
+              currentUserRank: currentRank,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _titleForScope(_Scope scope, String cohort, String school) {
+    switch (scope) {
+      case _Scope.cohort:
+        return cohort;
+      case _Scope.school:
+        return school;
+      case _Scope.course:
+        return 'This Course';
+      case _Scope.overall:
+        return 'Everyone';
+    }
+  }
+}
+
+class _ScopeChips extends StatelessWidget {
+  final _Scope scope;
+  final ValueChanged<_Scope> onChange;
+
+  const _ScopeChips({required this.scope, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (_Scope.cohort, 'Cohort'),
+      (_Scope.school, 'School'),
+      (_Scope.course, 'Course'),
+      (_Scope.overall, 'Overall'),
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _ScopeChip(
+              label: items[i].$2,
+              selected: scope == items[i].$1,
+              onTap: () => onChange(items[i].$1),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ScopeChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ScopeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.chip),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppPalette.primary : AppPalette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.chip),
+          border: Border.all(
+            color: selected ? AppPalette.primary : AppPalette.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: selected ? Colors.white : AppPalette.text,
+            fontWeight: FontWeight.w500,
+            height: 1.2,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _YourRankCard extends StatelessWidget {
+  final int? rank;
+  final int total;
+  final int delta;
+
+  const _YourRankCard({
+    required this.rank,
+    required this.total,
+    required this.delta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasRank = rank != null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppPalette.ink,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            hasRank ? '#$rank' : '—',
+            style: theme.textTheme.displayMedium?.copyWith(
+              color: Colors.white,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              fontSize: 40,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Leaderboard',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '${auth.schoolName ?? "Your School"} — ${auth.cohortName ?? ""}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Filter chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'Overall',
-                        isSelected: _filter == 'overall',
-                        onTap: () => setState(() => _filter = 'overall'),
-                      ),
-                      ...mockCourses.map((course) => _FilterChip(
-                            label: course.title,
-                            isSelected: _filter == course.id,
-                            onTap: () =>
-                                setState(() => _filter = course.id),
-                          )),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Top 3 podium
-          if (entries.length >= 3)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _PodiumCard(
-                    entry: entries[1],
-                    height: 90,
-                    color: Colors.grey.shade400,
-                    medal: '2nd',
-                  ),
-                  const SizedBox(width: 8),
-                  _PodiumCard(
-                    entry: entries[0],
-                    height: 110,
-                    color: Colors.amber,
-                    medal: '1st',
-                  ),
-                  const SizedBox(width: 8),
-                  _PodiumCard(
-                    entry: entries[2],
-                    height: 75,
-                    color: Colors.brown.shade300,
-                    medal: '3rd',
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 12),
-
-          // Full list
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: entries.length,
-              itemBuilder: (context, index) {
-                final entry = entries[index];
-                final isCurrentUser =
-                    entry.studentName == state.studentName;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 4),
-                  decoration: BoxDecoration(
-                    color: isCurrentUser
-                        ? theme.colorScheme.primaryContainer
-                        : null,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: index < 3
-                          ? [Colors.amber, Colors.grey.shade400, Colors.brown.shade300][index]
-                          : theme.colorScheme.surfaceContainerHighest,
-                      child: Text(
-                        '${entry.rank}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: index < 3
-                              ? Colors.white
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      entry.studentName +
-                          (isCurrentUser ? ' (You)' : ''),
-                      style: TextStyle(
-                        fontWeight: isCurrentUser
-                            ? FontWeight.bold
-                            : FontWeight.w500,
-                      ),
-                    ),
-                    trailing: Text(
-                      entry.score.toStringAsFixed(0),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Your rank banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: theme.colorScheme.primaryContainer,
-            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.person, size: 20),
-                const SizedBox(width: 8),
                 Text(
-                  'Your Rank: --',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  'YOUR RANK',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppPalette.cyan,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(height: 2),
                 Text(
-                  '(complete courses to rank)',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  hasRank
+                      ? (delta > 0
+                          ? '+$delta places this week'
+                          : delta < 0
+                              ? '$delta places this week'
+                              : 'no change this week')
+                      : 'complete a course to rank',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFFCBD5E1),
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              hasRank ? 'of $total' : 'of —',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: const Color(0xFFCBD5E1),
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
@@ -191,101 +235,231 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+class _Top3Row extends StatelessWidget {
+  final List<LeaderboardEntry> entries;
+  const _Top3Row({required this.entries});
 
-  const _FilterChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
+  static const _avatarColors = [
+    AppPalette.primary,
+    AppPalette.cyan,
+    Color(0xFFCBD5E1),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(entries.length, (i) {
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i < entries.length - 1 ? 8 : 0),
+            child: _Top3Card(
+              entry: entries[i],
+              avatarColor: _avatarColors[i],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _Top3Card extends StatelessWidget {
+  final LeaderboardEntry entry;
+  final Color avatarColor;
+
+  const _Top3Card({required this.entry, required this.avatarColor});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    final firstName = entry.studentName.split(' ').first;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: avatarColor,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              _initials(entry.studentName),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-        ),
-        selected: isSelected,
-        onSelected: (_) => onTap(),
-        showCheckmark: false,
-        selectedColor: theme.colorScheme.primaryContainer,
+          const SizedBox(height: 10),
+          Text(
+            '#${entry.rank}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.textSoft,
+            ),
+          ),
+          Text(
+            firstName,
+            style: theme.textTheme.titleSmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            entry.score.toStringAsFixed(0),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: AppPalette.primary,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
+  }
+}
+
+class _RankList extends StatelessWidget {
+  final List<LeaderboardEntry> entries;
+  final String? currentUserName;
+  final int? currentUserRank;
+
+  const _RankList({
+    required this.entries,
+    required this.currentUserName,
+    required this.currentUserRank,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) return const SizedBox.shrink();
+    return Container(
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < entries.length; i++) ...[
+            _RankRow(
+              entry: entries[i],
+              isCurrentUser: currentUserName != null &&
+                  entries[i].studentName == currentUserName,
+            ),
+            if (i < entries.length - 1)
+              const Divider(height: 1, color: AppPalette.border),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _PodiumCard extends StatelessWidget {
+class _RankRow extends StatelessWidget {
   final LeaderboardEntry entry;
-  final double height;
-  final Color color;
-  final String medal;
+  final bool isCurrentUser;
 
-  const _PodiumCard({
-    required this.entry,
-    required this.height,
-    required this.color,
-    required this.medal,
-  });
+  const _RankRow({required this.entry, required this.isCurrentUser});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: color,
-          child: Text(
-            entry.studentName[0],
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+    final initials = _initials(entry.studentName);
+    final firstAndLast = _firstAndLastInitial(entry.studentName);
+
+    return Container(
+      color: isCurrentUser ? AppPalette.primaryWash : null,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 36,
+            child: Text(
+              '#${entry.rank}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.textSoft,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          entry.studentName.split(' ').first,
-          style: theme.textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          entry.score.toStringAsFixed(0),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: 80,
-          height: height,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.3),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(8),
+          const SizedBox(width: 6),
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: isCurrentUser
+                  ? AppPalette.primary
+                  : const Color(0xFFCBD5E1),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              initials,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
-          alignment: Alignment.center,
-          child: Text(
-            medal,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              isCurrentUser ? '$firstAndLast (you)' : firstAndLast,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight:
+                    isCurrentUser ? FontWeight.w700 : FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 8),
+          Text(
+            entry.score.toStringAsFixed(0),
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: AppPalette.text,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  String _initials(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+        .toUpperCase();
+  }
+
+  /// "Aarav Patel" → "Aarav P."
+  String _firstAndLastInitial(String name) {
+    final parts =
+        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return name;
+    if (parts.length == 1) return parts.first;
+    return '${parts.first} ${parts.last.substring(0, 1).toUpperCase()}.';
   }
 }

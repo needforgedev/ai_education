@@ -7,6 +7,7 @@ import 'student_dashboard_screen.dart';
 import 'course_list_screen.dart';
 import 'community_screen.dart';
 import 'leaderboard_screen.dart';
+import 'settings_screen.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
@@ -26,6 +27,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     const CourseListScreen(),
     const CommunityScreen(),
     const LeaderboardScreen(),
+    const SettingsScreen(),
   ];
 
   void _maybeTriggerSync() {
@@ -72,19 +74,24 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.auto_stories_outlined),
-            selectedIcon: Icon(Icons.auto_stories),
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book),
             label: 'Courses',
           ),
           NavigationDestination(
-            icon: Icon(Icons.forum_outlined),
-            selectedIcon: Icon(Icons.forum),
-            label: 'Community',
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Discuss',
           ),
           NavigationDestination(
-            icon: Icon(Icons.leaderboard_outlined),
-            selectedIcon: Icon(Icons.leaderboard),
-            label: 'Leaderboard',
+            icon: Icon(Icons.emoji_events_outlined),
+            selectedIcon: Icon(Icons.emoji_events),
+            label: 'Ranks',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),
