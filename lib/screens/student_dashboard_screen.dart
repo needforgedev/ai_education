@@ -102,18 +102,6 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        IconButton(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            );
-          },
-          icon: const Icon(Icons.notifications_outlined),
-          color: AppPalette.text,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-        ),
-        const SizedBox(width: 8),
         InkWell(
           onTap: () {
             Navigator.of(context).push(

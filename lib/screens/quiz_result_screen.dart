@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app/theme.dart';
 import '../data/models/module.dart';
 import 'quiz_screen.dart';
 
@@ -27,154 +28,221 @@ class QuizResultScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: AppPalette.bg,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Spacer(flex: 2),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: passed
-                      ? Colors.green.withValues(alpha: 0.12)
-                      : Colors.red.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  passed ? Icons.emoji_events : Icons.refresh,
-                  size: 52,
-                  color: passed ? Colors.green : Colors.red,
-                ),
-              ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 12),
               Text(
-                passed ? 'Module Passed!' : 'Not Passed',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: passed ? Colors.green : Colors.red,
-                ),
+                'MODULE ${module.orderIndex} · QUIZ RESULT',
+                style: AppText.eyebrow(context, color: AppPalette.primary),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
-                'Module ${module.orderIndex}: ${module.title}',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                passed ? 'Module passed!' : 'Not quite there',
+                style: theme.textTheme.displayMedium?.copyWith(fontSize: 36),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                module.title,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppPalette.textSoft,
                 ),
               ),
-              const SizedBox(height: 28),
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      '$score / 20',
-                      style: theme.textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: passed ? Colors.green : Colors.red,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$correctAnswers of $totalQuestions correct',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (isNewBest) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'New best score!',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ] else if (previousBest != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Best score: $previousBest / 20',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              const SizedBox(height: 24),
+              _ScoreCard(
+                score: score,
+                correctAnswers: correctAnswers,
+                totalQuestions: totalQuestions,
+                isNewBest: isNewBest,
+                previousBest: previousBest,
+                passed: passed,
               ),
               const SizedBox(height: 16),
+              Text(
+                passed
+                    ? 'Great work — the next module is unlocked.'
+                    : 'You need 10/20 (50%) to pass. Take another shot.',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: AppPalette.textSoft, height: 1.5),
+              ),
+              const Spacer(),
               if (!passed) ...[
-                Text(
-                  'You need at least 50% (10/20) to pass.\nRetake the quiz to try again.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.red.shade700,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ] else ...[
-                Text(
-                  'Great job! The next module is unlocked.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const Spacer(flex: 3),
-              if (!passed)
                 SizedBox(
                   width: double.infinity,
-                  height: 52,
                   child: FilledButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => QuizScreen(module: module),
-                        ),
-                      );
-                    },
-                    child: const Text('Retake Quiz'),
+                    onPressed: () => _retake(context),
+                    child: const Text('Retake quiz'),
                   ),
                 ),
-              if (!passed) const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: passed
-                    ? FilledButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Continue'),
-                      )
-                    : OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Back to Course'),
-                      ),
-              ),
-              if (passed) ...[
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => QuizScreen(module: module),
-                      ),
-                    );
-                  },
-                  child: const Text('Retake to improve score'),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Back to course'),
+                  ),
+                ),
+              ] else ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Continue'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => _retake(context),
+                    child: const Text('Retake to improve'),
+                  ),
                 ),
               ],
-              const Spacer(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _retake(BuildContext context) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => QuizScreen(module: module),
+      ),
+    );
+  }
+}
+
+class _ScoreCard extends StatelessWidget {
+  final int score;
+  final int correctAnswers;
+  final int totalQuestions;
+  final bool isNewBest;
+  final int? previousBest;
+  final bool passed;
+
+  const _ScoreCard({
+    required this.score,
+    required this.correctAnswers,
+    required this.totalQuestions,
+    required this.isNewBest,
+    required this.previousBest,
+    required this.passed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = passed ? AppPalette.primary : const Color(0xFFDC2626);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppPalette.ink,
+        borderRadius: BorderRadius.circular(AppRadii.card + 4),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -36,
+            top: -36,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    accent.withValues(alpha: 0.5),
+                    Colors.transparent,
+                  ],
+                  stops: const [0, 0.7],
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'YOUR SCORE',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: passed ? AppPalette.cyan : const Color(0xFFFCA5A5),
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (isNewBest)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppPalette.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'NEW BEST',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.white,
+                          letterSpacing: 1.0,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              RichText(
+                text: TextSpan(
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    color: Colors.white,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    fontSize: 56,
+                    height: 1.0,
+                  ),
+                  children: [
+                    TextSpan(text: '$score'),
+                    TextSpan(
+                      text: ' / 20',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFFCBD5E1),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '$correctAnswers of $totalQuestions correct',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: const Color(0xFFCBD5E1)),
+              ),
+              if (!isNewBest && previousBest != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Best score: $previousBest / 20',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppPalette.cyan,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../app/theme.dart';
 import '../core/connectivity/connectivity_provider.dart';
+import '../core/connectivity/offline_gate.dart';
 import '../data/models/course.dart';
 import '../data/models/submission.dart';
 import '../features/auth/providers/auth_provider.dart';
@@ -87,19 +89,34 @@ class _FinalSubmissionScreenState extends ConsumerState<FinalSubmissionScreen> {
     final online = ref.watch(isOnlineProvider);
     if (!online) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Final Submission')),
-        body: const _OfflineGate(),
+        backgroundColor: AppPalette.bg,
+        appBar: AppBar(
+          title: const Text('Final submission'),
+          backgroundColor: AppPalette.bg,
+        ),
+        body: const OfflineGate(
+          body:
+              'Submissions need internet so we can upload your file. Reconnect and try again!',
+        ),
       );
     }
 
     final existingAsync = ref.watch(submissionForCourseProvider(widget.course.id));
     return existingAsync.when(
       loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Final Submission')),
+        backgroundColor: AppPalette.bg,
+        appBar: AppBar(
+          title: const Text('Final submission'),
+          backgroundColor: AppPalette.bg,
+        ),
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (err, _) => Scaffold(
-        appBar: AppBar(title: const Text('Final Submission')),
+        backgroundColor: AppPalette.bg,
+        appBar: AppBar(
+          title: const Text('Final submission'),
+          backgroundColor: AppPalette.bg,
+        ),
         body: Center(child: Text('Error: $err')),
       ),
       data: (existing) {
@@ -114,130 +131,128 @@ class _FinalSubmissionScreenState extends ConsumerState<FinalSubmissionScreen> {
   Widget _buildForm(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Final Submission')),
+      backgroundColor: AppPalette.bg,
+      appBar: AppBar(
+        title: const SizedBox.shrink(),
+        backgroundColor: AppPalette.bg,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text('FINAL PROJECT · 80 MARKS',
+                style: AppText.eyebrow(context, color: AppPalette.primary)),
+            const SizedBox(height: 8),
+            Text(widget.course.title, style: theme.textTheme.displaySmall),
+            const SizedBox(height: 6),
+            Text(
+              'Ship your final project and a moderator will grade it.',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: AppPalette.textSoft, height: 1.5),
+            ),
+            const SizedBox(height: 22),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: theme.colorScheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(12),
+                color: AppPalette.primaryWash,
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                border: Border.all(color: AppPalette.primary),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: theme.colorScheme.tertiary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Worth 80 marks. A moderator will review and grade your work.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onTertiaryContainer,
-                      ),
-                    ),
+                  Text('THE TASK',
+                      style: AppText.eyebrow(context,
+                          color: AppPalette.primary)),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Create a simple explanation of an AI use-case you see in your daily life. Describe how it works, what data it might use, and why it matters.',
+                    style: theme.textTheme.bodyLarge
+                        ?.copyWith(color: AppPalette.text, height: 1.45),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-            Text('Course',
-                style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 4),
-            Text(widget.course.title,
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 24),
-            Text('Task',
-                style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 4),
-            Text(
-              'Create a simple explanation of an AI use-case you see in your daily life. Describe how it works, what data it might use, and why it matters.',
-              style: theme.textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 28),
-            Text('Upload File',
-                style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 22),
+            Text('UPLOAD FILE', style: AppText.eyebrow(context)),
             const SizedBox(height: 8),
             InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadii.card),
               onTap: _submitting ? null : _pickFile,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
+                  color: AppPalette.surface,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
                   border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                    color: _pickedFile != null
+                        ? AppPalette.primary
+                        : AppPalette.border,
                     width: 1.5,
                   ),
-                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   children: [
                     Icon(
                       _pickedFile != null
                           ? Icons.insert_drive_file
-                          : Icons.cloud_upload_outlined,
-                      size: 40,
+                          : Icons.upload_file_outlined,
+                      size: 36,
                       color: _pickedFile != null
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
+                          ? AppPalette.primary
+                          : AppPalette.textSoft,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Text(
                       _pickedFile?.name ?? 'Tap to choose file',
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: theme.textTheme.titleSmall?.copyWith(
                         color: _pickedFile != null
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant,
-                        fontWeight: _pickedFile != null
-                            ? FontWeight.w600
-                            : FontWeight.normal,
+                            ? AppPalette.primary
+                            : AppPalette.text,
                       ),
                     ),
-                    if (_pickedFile == null)
+                    if (_pickedFile == null) ...[
+                      const SizedBox(height: 4),
                       Text(
                         'Accepted: ${_allowedExtensions.map((e) => ".$e").join(", ")}',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: AppPalette.textSoft,
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
+            Text('NOTES (OPTIONAL)', style: AppText.eyebrow(context)),
+            const SizedBox(height: 8),
             TextField(
               controller: _notesController,
               maxLines: 4,
               enabled: !_submitting,
               decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                hintText: 'Add any extra notes about your submission...',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
+                hintText: 'Anything the moderator should know…',
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
             SizedBox(
               width: double.infinity,
-              height: 52,
               child: FilledButton(
                 onPressed: _submitting ? null : _submit,
                 child: _submitting
                     ? const SizedBox(
-                        height: 20,
-                        width: 20,
+                        height: 22,
+                        width: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
                         ),
                       )
-                    : const Text('Submit Project'),
+                    : const Text('Submit project'),
               ),
             ),
           ],
@@ -259,85 +274,74 @@ class _SubmittedView extends StatelessWidget {
     final isGraded = submission.isGraded;
 
     return Scaffold(
+      backgroundColor: AppPalette.bg,
+      appBar: AppBar(
+        title: const SizedBox.shrink(),
+        backgroundColor: AppPalette.bg,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Spacer(flex: 2),
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: isGraded
-                      ? Colors.green.withValues(alpha: 0.12)
-                      : theme.colorScheme.tertiaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isGraded ? Icons.grading : Icons.cloud_done_outlined,
-                  size: 52,
-                  color: isGraded ? Colors.green : theme.colorScheme.tertiary,
-                ),
-              ),
-              const SizedBox(height: 28),
               Text(
-                isGraded ? 'Graded!' : 'Submission Received!',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+                isGraded ? 'GRADED' : 'SUBMITTED',
+                style: AppText.eyebrow(
+                  context,
+                  color: isGraded ? Colors.green : AppPalette.cyan,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
-                isGraded
-                    ? 'Your project for "${course.title}" has been graded.'
-                    : 'Your project for "${course.title}" has been submitted. A moderator will review it soon.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                isGraded ? 'You\'re graded!' : 'Your project is in.',
+                style: theme.textTheme.displaySmall,
               ),
-              if (isGraded) ...[
-                const SizedBox(height: 24),
+              const SizedBox(height: 6),
+              Text(
+                course.title,
+                style: theme.textTheme.bodyLarge
+                    ?.copyWith(color: AppPalette.textSoft),
+              ),
+              const SizedBox(height: 24),
+              if (isGraded)
+                _GradedScoreCard(
+                  score: submission.scoreOutOf80 ?? 0,
+                  feedback: submission.moderatorFeedback,
+                )
+              else
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppPalette.surface,
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    border: Border.all(color: AppPalette.border),
                   ),
-                  child: Column(
+                  child: Row(
                     children: [
-                      Text(
-                        '${submission.scoreOutOf80} / 80',
-                        style: theme.textTheme.displaySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
+                      Icon(Icons.hourglass_top,
+                          color: AppPalette.cyan, size: 28),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          'A moderator will review your project soon. We\'ll notify you when it\'s graded.',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: AppPalette.text, height: 1.4),
                         ),
                       ),
-                      if (submission.moderatorFeedback != null &&
-                          submission.moderatorFeedback!.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          submission.moderatorFeedback!,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ],
                     ],
                   ),
                 ),
-              ],
-              const Spacer(flex: 3),
+              const Spacer(),
               SizedBox(
                 width: double.infinity,
-                height: 52,
                 child: FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Back to Course'),
+                  child: const Text('Back to course'),
                 ),
               ),
-              const Spacer(),
             ],
           ),
         ),
@@ -346,31 +350,96 @@ class _SubmittedView extends StatelessWidget {
   }
 }
 
-class _OfflineGate extends StatelessWidget {
-  const _OfflineGate();
+class _GradedScoreCard extends StatelessWidget {
+  final int score;
+  final String? feedback;
+
+  const _GradedScoreCard({required this.score, required this.feedback});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off, size: 64, color: theme.colorScheme.outline),
-            const SizedBox(height: 16),
-            Text('Connect to internet', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              'Submissions need internet so we can upload your file. Reconnect and try again!',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppPalette.ink,
+        borderRadius: BorderRadius.circular(AppRadii.card + 4),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -36,
+            top: -36,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppPalette.primary.withValues(alpha: 0.5),
+                    Colors.transparent,
+                  ],
+                  stops: const [0, 0.7],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'YOUR SCORE',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: AppPalette.cyan,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              RichText(
+                text: TextSpan(
+                  style: theme.textTheme.displayLarge?.copyWith(
+                    color: Colors.white,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    fontSize: 56,
+                    height: 1.0,
+                  ),
+                  children: [
+                    TextSpan(text: '$score'),
+                    TextSpan(
+                      text: ' / 80',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFFCBD5E1),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (feedback != null && feedback!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('FEEDBACK',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppPalette.cyan,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w600,
+                    )),
+                const SizedBox(height: 6),
+                Text(
+                  feedback!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: const Color(0xFFE2E8F0),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }

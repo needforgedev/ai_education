@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/theme.dart';
+import '../data/models/leaderboard_rank.dart';
+import '../data/repositories/leaderboard_repository.dart';
 import '../features/auth/providers/auth_provider.dart';
-import '../mock/mock_data.dart';
-
-enum _Scope { cohort, school, course, overall }
+import '../features/leaderboard/providers/leaderboard_providers.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
@@ -14,87 +14,122 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 }
 
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
-  _Scope _scope = _Scope.cohort;
+  LeaderboardScope _scope = LeaderboardScope.cohort;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final auth = ref.watch(authProvider);
-    final school = auth.schoolName ?? 'Your School';
     final cohort = auth.cohortName ?? 'Cohort';
-    final entries = mockLeaderboardEntries(school);
-    // Stub current rank — real value comes from course_progress view (Step 10)
-    const currentRank = 8;
-    const totalEntrants = 124;
-    const rankDelta = 3;
+    final school = auth.schoolName ?? 'Your School';
+    final query = LeaderboardQuery(scope: _scope);
+    final async = ref.watch(leaderboardProvider(query));
+    final currentUserId = auth.studentProfile?.id;
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Leaderboard',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: AppPalette.textSoft)),
-            const SizedBox(height: 2),
-            Text(_titleForScope(_scope, cohort, school),
-                style: theme.textTheme.displaySmall),
-            const SizedBox(height: 18),
-            _ScopeChips(
-              scope: _scope,
-              onChange: (s) => setState(() => _scope = s),
-            ),
-            const SizedBox(height: 20),
-            _YourRankCard(
-              rank: currentRank,
-              total: totalEntrants,
-              delta: rankDelta,
-            ),
-            const SizedBox(height: 24),
-            Text('TOP 3', style: AppText.eyebrow(context)),
-            const SizedBox(height: 12),
-            if (entries.length >= 3)
-              _Top3Row(entries: entries.take(3).toList()),
-            const SizedBox(height: 18),
-            _RankList(
-              entries: entries.skip(3).toList(),
-              currentUserName: auth.studentProfile?.fullName,
-              currentUserRank: currentRank,
-            ),
-          ],
+      child: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(leaderboardProvider(query));
+          await ref.read(leaderboardProvider(query).future);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Leaderboard',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: AppPalette.textSoft)),
+              const SizedBox(height: 2),
+              Text(_titleForScope(_scope, cohort, school),
+                  style: theme.textTheme.displaySmall),
+              const SizedBox(height: 18),
+              _ScopeChips(
+                scope: _scope,
+                onChange: (s) => setState(() => _scope = s),
+              ),
+              const SizedBox(height: 20),
+              async.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 64),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (err, _) => _ErrorState(message: err.toString()),
+                data: (result) => _LeaderboardBody(
+                  result: result,
+                  currentUserId: currentUserId,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String _titleForScope(_Scope scope, String cohort, String school) {
+  String _titleForScope(LeaderboardScope scope, String cohort, String school) {
     switch (scope) {
-      case _Scope.cohort:
+      case LeaderboardScope.cohort:
         return cohort;
-      case _Scope.school:
+      case LeaderboardScope.school:
         return school;
-      case _Scope.course:
-        return 'This Course';
-      case _Scope.overall:
+      case LeaderboardScope.course:
+        return 'Active course';
+      case LeaderboardScope.overall:
         return 'Everyone';
     }
   }
 }
 
+class _LeaderboardBody extends StatelessWidget {
+  final LeaderboardResult result;
+  final String? currentUserId;
+
+  const _LeaderboardBody({required this.result, required this.currentUserId});
+
+  @override
+  Widget build(BuildContext context) {
+    if (result.entries.isEmpty) {
+      return const _EmptyLeaderboard();
+    }
+
+    final top3 = result.entries.take(3).toList();
+    final rest = result.entries.skip(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _YourRankCard(
+          currentUser: result.currentUserEntry,
+          total: result.totalEntrants,
+        ),
+        const SizedBox(height: 24),
+        Text('TOP 3', style: AppText.eyebrow(context)),
+        const SizedBox(height: 12),
+        _Top3Row(entries: top3, currentUserId: currentUserId),
+        if (rest.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          _RankList(entries: rest, currentUserId: currentUserId),
+        ],
+      ],
+    );
+  }
+}
+
 class _ScopeChips extends StatelessWidget {
-  final _Scope scope;
-  final ValueChanged<_Scope> onChange;
+  final LeaderboardScope scope;
+  final ValueChanged<LeaderboardScope> onChange;
 
   const _ScopeChips({required this.scope, required this.onChange});
 
   @override
   Widget build(BuildContext context) {
     final items = [
-      (_Scope.cohort, 'Cohort'),
-      (_Scope.school, 'School'),
-      (_Scope.course, 'Course'),
-      (_Scope.overall, 'Overall'),
+      (LeaderboardScope.cohort, 'Cohort'),
+      (LeaderboardScope.school, 'School'),
+      (LeaderboardScope.course, 'Course'),
+      (LeaderboardScope.overall, 'Overall'),
     ];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -155,20 +190,15 @@ class _ScopeChip extends StatelessWidget {
 }
 
 class _YourRankCard extends StatelessWidget {
-  final int? rank;
+  final LeaderboardRank? currentUser;
   final int total;
-  final int delta;
 
-  const _YourRankCard({
-    required this.rank,
-    required this.total,
-    required this.delta,
-  });
+  const _YourRankCard({required this.currentUser, required this.total});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasRank = rank != null;
+    final hasRank = currentUser != null;
 
     return Container(
       width: double.infinity,
@@ -181,7 +211,7 @@ class _YourRankCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            hasRank ? '#$rank' : '—',
+            hasRank ? '#${currentUser!.rank}' : '—',
             style: theme.textTheme.displayMedium?.copyWith(
               color: Colors.white,
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -205,11 +235,7 @@ class _YourRankCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   hasRank
-                      ? (delta > 0
-                          ? '+$delta places this week'
-                          : delta < 0
-                              ? '$delta places this week'
-                              : 'no change this week')
+                      ? 'Score ${currentUser!.score.toStringAsFixed(1)}'
                       : 'complete a course to rank',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFFCBD5E1),
@@ -222,7 +248,7 @@ class _YourRankCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              hasRank ? 'of $total' : 'of —',
+              hasRank ? 'of $total' : 'of $total',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: const Color(0xFFCBD5E1),
                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -236,8 +262,10 @@ class _YourRankCard extends StatelessWidget {
 }
 
 class _Top3Row extends StatelessWidget {
-  final List<LeaderboardEntry> entries;
-  const _Top3Row({required this.entries});
+  final List<LeaderboardRank> entries;
+  final String? currentUserId;
+
+  const _Top3Row({required this.entries, required this.currentUserId});
 
   static const _avatarColors = [
     AppPalette.primary,
@@ -254,7 +282,8 @@ class _Top3Row extends StatelessWidget {
             padding: EdgeInsets.only(right: i < entries.length - 1 ? 8 : 0),
             child: _Top3Card(
               entry: entries[i],
-              avatarColor: _avatarColors[i],
+              avatarColor: _avatarColors[i % _avatarColors.length],
+              isCurrentUser: entries[i].studentId == currentUserId,
             ),
           ),
         );
@@ -264,10 +293,15 @@ class _Top3Row extends StatelessWidget {
 }
 
 class _Top3Card extends StatelessWidget {
-  final LeaderboardEntry entry;
+  final LeaderboardRank entry;
   final Color avatarColor;
+  final bool isCurrentUser;
 
-  const _Top3Card({required this.entry, required this.avatarColor});
+  const _Top3Card({
+    required this.entry,
+    required this.avatarColor,
+    required this.isCurrentUser,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -277,9 +311,11 @@ class _Top3Card extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       decoration: BoxDecoration(
-        color: AppPalette.surface,
+        color: isCurrentUser ? AppPalette.primaryWash : AppPalette.surface,
         borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppPalette.border),
+        border: Border.all(
+          color: isCurrentUser ? AppPalette.primary : AppPalette.border,
+        ),
       ),
       child: Column(
         children: [
@@ -336,19 +372,13 @@ class _Top3Card extends StatelessWidget {
 }
 
 class _RankList extends StatelessWidget {
-  final List<LeaderboardEntry> entries;
-  final String? currentUserName;
-  final int? currentUserRank;
+  final List<LeaderboardRank> entries;
+  final String? currentUserId;
 
-  const _RankList({
-    required this.entries,
-    required this.currentUserName,
-    required this.currentUserRank,
-  });
+  const _RankList({required this.entries, required this.currentUserId});
 
   @override
   Widget build(BuildContext context) {
-    if (entries.isEmpty) return const SizedBox.shrink();
     return Container(
       decoration: BoxDecoration(
         color: AppPalette.surface,
@@ -361,8 +391,7 @@ class _RankList extends StatelessWidget {
           for (var i = 0; i < entries.length; i++) ...[
             _RankRow(
               entry: entries[i],
-              isCurrentUser: currentUserName != null &&
-                  entries[i].studentName == currentUserName,
+              isCurrentUser: entries[i].studentId == currentUserId,
             ),
             if (i < entries.length - 1)
               const Divider(height: 1, color: AppPalette.border),
@@ -374,7 +403,7 @@ class _RankList extends StatelessWidget {
 }
 
 class _RankRow extends StatelessWidget {
-  final LeaderboardEntry entry;
+  final LeaderboardRank entry;
   final bool isCurrentUser;
 
   const _RankRow({required this.entry, required this.isCurrentUser});
@@ -454,12 +483,66 @@ class _RankRow extends StatelessWidget {
         .toUpperCase();
   }
 
-  /// "Aarav Patel" → "Aarav P."
   String _firstAndLastInitial(String name) {
     final parts =
         name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) return name;
     if (parts.length == 1) return parts.first;
     return '${parts.first} ${parts.last.substring(0, 1).toUpperCase()}.';
+  }
+}
+
+class _EmptyLeaderboard extends StatelessWidget {
+  const _EmptyLeaderboard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.emoji_events_outlined,
+              size: 48, color: AppPalette.textSoft),
+          const SizedBox(height: 12),
+          Text('No rankings yet',
+              style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            'The leaderboard updates as students complete modules and quizzes.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: AppPalette.textSoft),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  const _ErrorState({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
+      child: Text('Could not load leaderboard.\n$message',
+          style: Theme.of(context).textTheme.bodyMedium),
+    );
   }
 }

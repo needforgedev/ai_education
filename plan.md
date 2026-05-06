@@ -1,7 +1,7 @@
 # AI Education Platform — Build Plan & Progress Tracker
 
-> **Last updated:** 2026-04-17
-> **Overall progress:** Phase 3 in progress (Steps 1-9 + 11 done, Step 13 partially done for Grades 3-4 trial, offline-first learning + offline auth persistence in place, next: Steps 10 + 12 — leaderboard and notifications)
+> **Last updated:** 2026-05-06
+> **Overall progress:** Phase 3 in progress. Steps 1-11 + 13 done; Teen "builder energy" design system applied across all major screens (Indigo + Cyan + Space Grotesk via google_fonts); profile screen with 20-achievement engine; editable profile + email; Step 12 (notifications) is the only remaining Phase 3 item.
 
 ---
 
@@ -104,7 +104,7 @@
 
 - [x] Create `course_progress` view (05_views.sql)
 - [x] Create `validate_school_code()` RPC function (05_views.sql)
-- [ ] Create `leaderboard_ranked` function/view — needed for Step 10
+- [x] Create `get_leaderboard` SQL function (`07_leaderboard.sql`) — ranks students by avg score across course_progress; supports cohort/school/course/overall scopes
 
 ### 1.6 Storage
 - [x] Create `submissions` bucket in Supabase dashboard
@@ -132,6 +132,7 @@
 - [x] Add `connectivity_plus` to pubspec.yaml (detect online/offline for quiz/submission/community gates)
 - [x] Add `url_launcher` to pubspec.yaml (kept for potential future external opens; in-app viewer is now primary)
 - [x] Add `flutter_pdfview` + `path_provider` to pubspec.yaml (in-app PDF rendering for submission review)
+- [x] Add `google_fonts` to pubspec.yaml (Space Grotesk for the Teen design system)
 - [x] Run `flutter pub get`
 
 ### 2.2 App shell
@@ -281,14 +282,17 @@
 - [x] Community + Leaderboard + Dashboard screens show real school/cohort names from auth provider
 - [x] Add connectivity gate to community screens — reusable `OfflineGate` widget in `lib/core/connectivity/`, applied to `community_screen.dart` + `moderator_community_screen.dart`
 
-### Step 10: Leaderboard (online only)
+### Step 10: Leaderboard (online only) — DONE
 > `lib/data/repositories/leaderboard_repository.dart` + `lib/features/leaderboard/`
 >
-> **Online-only:** Rankings require server-side aggregation.
+> **Online-only:** Rankings require server-side aggregation via SQL function.
 
-- [ ] `leaderboard_repository.dart` — getLeaderboard with filters (course, cohort, school, overall)
-- [ ] `leaderboard_provider.dart`
-- [ ] Migrate `leaderboard_screen.dart` — real ranked data from course_progress view, highlight current student
+- [x] `supabase/sql/07_leaderboard.sql` — `get_leaderboard(scope, cohort_id, school_id, course_id)` function that aggregates per-student score from `course_progress`, ranks via window function, returns `(student_id, student_name, score, rank)` rows. Score = avg of total_score_out_of_100 (falls back to avg_quiz_score × 5 when no graded submission yet).
+- [x] `lib/data/models/leaderboard_rank.dart` — model for ranked rows
+- [x] `leaderboard_repository.dart` — `getLeaderboard()` with `LeaderboardScope` enum (cohort/school/course/overall); also returns the current user's entry pre-extracted
+- [x] `leaderboard_providers.dart` — `leaderboardProvider` family keyed by `LeaderboardQuery`; resolves cohort/school IDs from auth profile automatically
+- [x] Migrate `leaderboard_screen.dart` — real ranked data from `get_leaderboard`, scope chips (Cohort/School/Course/Overall), dark "YOUR RANK" card with score + position out of total, TOP 3 cards, list of remaining ranks with current-user highlight, empty + error states, pull-to-refresh
+- [x] Removed all references to `lib/mock/mock_data.dart` from the leaderboard screen — fully wired to Supabase
 
 ### Step 11: Moderator — DONE
 > `lib/data/repositories/moderator_repository.dart` + `lib/features/moderator/`
@@ -305,6 +309,27 @@
 - [x] Router updated — `submissionReview` route takes `detail: SubmissionDetail` (replaces legacy submission+course args)
 - [ ] Cohort/school filters on dashboard — deferred post-trial (only 1 course for Grades 3-4 right now)
 
+### Step 11.5: Design System Overhaul (Teen "builder energy") — DONE
+> Indigo + Cyan + Space Grotesk · `lib/app/theme.dart` rewrite + per-screen polish
+
+- [x] `theme.dart` rebuilt: `AppPalette` (indigo / cyan / ink / textSoft / border / primaryWash) + `AppRadii` + `AppText` helpers + Space Grotesk via `google_fonts`
+- [x] Welcome screen — bold "Master AI. One module at a time." headline, chunky indigo icon
+- [x] Login + Registration (4-step) screens — eyebrow labels, hint-styled inputs, indigo accents
+- [x] Cohort confirmation — "COHORT ASSIGNED" eyebrow + ink-black stats card
+- [x] Onboarding (3 slides) — `lib/features/onboarding/screens/onboarding_screen.dart`, "01/02/03" mono tag, indigo gradient hero with `step.N → loaded` caption, animated dot indicator, Next/Enter button
+- [x] Student dashboard — dark "Continue Learning" hero card + radial blob + cyan progress bar + indigo Resume pill, 3-stat grid, course rows
+- [x] Course list — colored card headers (top section indigo/cyan), bottom progress bar, scope chips (All / In progress / Completed / Not started)
+- [x] Course detail — Progress card with avg score, module list with circle status indicators (indigo done / cyan NOW / lock), final-project tile
+- [x] Module lesson — header progress bar, MODULE eyebrow, indigo-wash objective callout, content card
+- [x] Quiz — square A/B/C/D markers, indigo selection border
+- [x] Quiz result — dark hero score card with cyan accent + "NEW BEST" pill, retake/continue layout
+- [x] Final submission — indigo-wash task callout, file picker tile, dark graded score card with feedback
+- [x] Community + moderator community — connectivity gates, real threads/replies (already on Teen design via theme)
+- [x] Profile — settings gear top-right, big indigo avatar, stat strip, achievements grid, activity bar chart
+- [x] Settings — Account / Learning / Privacy sections, indigo toggle pills, "Sign out" red tile
+- [x] Edit field screen + Change password — match the rest of the auth/settings flow (eyebrow labels, Spacer-pinned CTA)
+- [x] Bottom nav: 5 tabs (Home, Courses, Discuss, Ranks, Profile), `indicatorColor: Colors.transparent` so selected tab shows colored icon + label without a pill
+
 ### Step 12: Notifications
 > `lib/features/notifications/` (spec S18)
 >
@@ -316,15 +341,20 @@
 - [ ] Notification list screen or bottom sheet
 - [ ] Trigger notifications: on submission graded, on moderator reply
 
-### Step 13: Settings + Student Dashboard — PARTIALLY DONE
-> `lib/features/student/providers/` + `lib/features/settings/`
+### Step 13: Settings + Student Dashboard + Profile — DONE
+> `lib/features/student/providers/` + `lib/features/settings/` + `lib/features/student/screens/profile_screen.dart`
 
-- [x] `dashboard_provider.dart` — aggregates `myCoursesProvider` + `moduleProgressForCourseProvider` into `DashboardData` (stats + summaries + continue-learning pointer)
-- [x] Migrate `student_dashboard_screen.dart` — real courses, per-course progress bars, Continue Learning card opens next module, pull-to-refresh
-- [ ] Add notification bell icon (pending Step 12)
-- [ ] Migrate `student_home_screen.dart` — wire tabs to feature folders (currently reaches legacy `lib/screens/` paths; functional but part of Phase 4 cleanup)
-- [x] Migrate `settings_screen.dart` — real logout via Supabase, profile from auth provider
-- [x] Create `change_password_screen.dart` — Supabase `updateUser` for password change
+- [x] `dashboard_provider.dart` — aggregates myCoursesProvider + moduleProgressForCourseProvider into `DashboardData` with `modulesCompleted`, `coursesInProgress`, `coursesDone`, `totalCourses`, `averageQuizScore`, `streakDays`, `activityByDay`, `continueCourse`, `continueNextModuleIndex`
+- [x] Migrate `student_dashboard_screen.dart` — Teen design (dark "Continue Learning" hero with cyan accent + radial blob, 3-stat grid, course rows with side bars), pull-to-refresh
+- [x] Notification bell **removed** from dashboard header (Step 12 deferred — bell will return when notifications feature lands)
+- [x] Build `lib/features/student/screens/profile_screen.dart` — big indigo avatar (2-letter initials), "Grade X · School", "COHORT N · NAME" eyebrow, 4-tile stat strip (modules / courses / avg / streak), 4×2 achievements grid, 30-day activity chart driven by real `quiz_attempts.attempted_at` dates
+- [x] Build 20-achievement engine: `lib/data/models/achievement.dart` + `lib/features/student/providers/achievements_provider.dart`. Pulls from `quiz_attempts`, `final_submissions`, `community_threads`, `community_replies`. Each tile is tappable → bottom sheet with "How to unlock" / "How you earned it" copy.
+- [x] Repo additions for achievements: `QuizRepository.getAllAttemptsForStudent`, `SubmissionRepository.getAllSubmissionsForStudent`, `CommunityRepository.getAuthorActivity` (threadCount + distinctRepliedThreads + activeDays)
+- [x] Migrate `settings_screen.dart` — Account / Learning / Privacy sections, indigo toggle pills, red "Sign out" tile, "< Profile" back link
+- [x] Editable Profile + Email: `lib/features/settings/screens/edit_field_screen.dart` (single-field editor with name vs email validation). Wired Profile + Email tiles in Settings to push the editor.
+- [x] Repo additions for editing: `StudentRepository.updateFullName`, `AuthRepository.updateEmail`, `AuthNotifier.refreshProfile()` (re-pulls profile + cohort/school names + updates UserCache)
+- [x] Create `change_password_screen.dart` — Supabase `updateUser` for password change (now restyled to match the Teen design)
+- [x] Wire `student_home_screen.dart` — 5-tab nav (Home, Courses, Discuss, Ranks, Profile), no pill indicator behind selected tab
 
 ---
 
@@ -472,7 +502,7 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 10 | File upload | Submission file in Storage bucket | [x] |
 | 11 | Moderator grading | Grade -> `final_submissions.status=graded` + score + `notifications` row | [x] (RLS fix applied via 06_fix_notifications_insert.sql; full flow verified) |
 | 12 | Community isolation | School A can't see School B threads | [x] |
-| 13 | Leaderboard | Rankings match course_progress view | [ ] |
+| 13 | Leaderboard | Rankings match `get_leaderboard` RPC, scope chips work, current user highlighted | [x] (RPC needs to be deployed via 07_leaderboard.sql) |
 | 14 | Notifications | Submission graded + moderator reply trigger notifications | [ ] |
 | 15 | RLS enforcement | Student A can't access Student B's data | [ ] |
 | 16 | Logout | Clears session, redirects to welcome | [x] |
@@ -501,6 +531,13 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 39 | In-app PDF viewer | Moderator taps "Open submission file" on a PDF → renders inline via flutter_pdfview | [ ] |
 | 40 | In-app text viewer | Moderator opens a `.py/.txt/.js/.dart` submission → contents render as selectable monospace text | [ ] |
 | 41 | Rubric validation | Publish disabled until all 4 categories have valid 0–20 scores; helper text explains why | [ ] |
+| 42 | Onboarding flow | After registration → cohort confirmation → 3 onboarding slides → home | [ ] |
+| 43 | Profile screen | Tab loads real avatar/initials, real stats from dashboard, real activity chart from quiz_attempts dates | [ ] |
+| 44 | Achievements engine | All 20 unlock predicates fire correctly; tap any tile shows modal with how-to-unlock or how-you-earned-it | [ ] |
+| 45 | Edit profile | Settings → Profile → edit name → saves to `students.full_name` and refreshes auth state | [ ] |
+| 46 | Edit email | Settings → Email → edit → triggers Supabase confirmation flow, snackbar instructs user to confirm | [ ] |
+| 47 | Bottom nav 5 tabs | Home / Courses / Discuss / Ranks / Profile, no pill behind selected tab | [x] (in code) |
+| 48 | Design system | All major screens render in Indigo + Cyan + Space Grotesk (Teen "builder energy") | [x] |
 
 ---
 
@@ -533,3 +570,13 @@ The app determines the role at login by checking if the user's `id` exists in th
 | 2026-04-17 | RLS bug fixed: notifications table had no INSERT policy → moderator grading 42501 errors. Added "Moderators can create notifications" policy (`06_fix_notifications_insert.sql` + patch in 03) | DONE |
 | 2026-04-17 | In-app file viewer for moderator: PDFs render via `flutter_pdfview`, text/code files shown as `SelectableText` (replaces external URL launch) | DONE |
 | 2026-04-17 | Real grading: rubric fields start empty, validate 0–20, "Publish Score" disabled until all four are valid | DONE |
+| 2026-05-06 | Teen "builder energy" design system applied: Indigo + Cyan + Space Grotesk via google_fonts; all major screens (welcome, login, register, cohort, onboarding, dashboard, courses, course detail, lesson, quiz, quiz result, submission, leaderboard, profile, settings, edit field, change password) match the design | DONE |
+| 2026-05-06 | Onboarding flow added: 3 info slides between cohort confirmation and home (only on registration path; returning login still goes straight to home) | DONE |
+| 2026-05-06 | Profile tab built: avatar, stats, 20-achievement engine, 30-day activity bar chart driven by real `quiz_attempts.attempted_at` data | DONE |
+| 2026-05-06 | 20-achievement engine: data sourced from `quiz_attempts`, `module_progress`, `final_submissions`, community thread+reply counts. Tappable tiles show "how to unlock" / "how you earned it" via modal bottom sheet | DONE |
+| 2026-05-06 | Editable Profile + Email in Settings: pushes generic `EditFieldScreen`, validates client-side, calls `StudentRepository.updateFullName` / `AuthRepository.updateEmail`, refreshes cached auth state | DONE |
+| 2026-05-06 | Step 10 (Leaderboard) complete: `get_leaderboard` SQL function in `07_leaderboard.sql`, repo + provider, screen wired to real data with scope chips, your-rank card, top 3, ranked list with current-user highlight, empty + error states | DONE |
+| 2026-05-06 | 5-tab bottom nav (Home/Courses/Discuss/Ranks/Profile) with `indicatorColor: Colors.transparent` so selected tab matches design (no pill behind icon) | DONE |
+| 2026-05-06 | Notification bell removed from dashboard header — Step 12 deferred; bell will return when notifications feature ships | DONE |
+| 2026-05-06 | Cleanup: deleted 3 dead duplicate auth screens (`lib/screens/welcome_screen.dart`, `registration_screen.dart`, `cohort_confirmation_screen.dart`). Real ones live in `lib/features/auth/screens/` | DONE |
+| 2026-05-06 | Curriculum mock kept on purpose — final content not yet authored. `lib/mock/` still contains `mockLeaderboardEntries` (no longer imported anywhere) and `app_state.dart` (legacy, unused). Safe to delete in Phase 4 | NOTED |
