@@ -16,6 +16,22 @@ class QuizRepository {
         .toList();
   }
 
+  /// Every quiz attempt timestamp for a student (newest first). Used to
+  /// derive streak days and activity histogram for the profile screen.
+  Future<List<DateTime>> getQuizAttemptDates(String studentId) async {
+    final result = await supabase
+        .from(Tables.quizAttempts)
+        .select('attempted_at')
+        .eq('student_id', studentId)
+        .order('attempted_at', ascending: false);
+
+    return (result as List)
+        .map((e) => DateTime.parse(
+              (e as Map<String, dynamic>)['attempted_at'] as String,
+            ).toLocal())
+        .toList();
+  }
+
   /// Records a quiz attempt AND updates module_progress (best score, passed, completed).
   /// Returns info the UI needs for the result screen.
   Future<QuizSubmitResult> submitAttempt({

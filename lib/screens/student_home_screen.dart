@@ -7,7 +7,7 @@ import 'student_dashboard_screen.dart';
 import 'course_list_screen.dart';
 import 'community_screen.dart';
 import 'leaderboard_screen.dart';
-import 'settings_screen.dart';
+import '../features/student/screens/profile_screen.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   const StudentHomeScreen({super.key});
@@ -27,7 +27,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     const CourseListScreen(),
     const CommunityScreen(),
     const LeaderboardScreen(),
-    const SettingsScreen(),
+    const ProfileScreen(),
   ];
 
   void _maybeTriggerSync() {

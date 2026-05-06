@@ -1,170 +1,306 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../features/auth/providers/auth_provider.dart';
 import '../app/router.dart';
+import '../app/theme.dart';
+import '../features/auth/providers/auth_provider.dart';
 import 'change_password_screen.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _reminders = true;
+  bool _sound = false;
+
+  void _comingSoon() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Coming soon')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final authState = ref.watch(authProvider);
-    final profile = authState.studentProfile;
+    final auth = ref.watch(authProvider);
+    final profile = auth.studentProfile;
+    final email = auth.user?.email ?? '—';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // Profile card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: Text(
-                    (profile?.fullName ?? authState.user?.email ?? 'S')[0]
-                        .toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: AppPalette.bg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () => Navigator.of(context).maybePop(),
+                borderRadius: BorderRadius.circular(AppRadii.button),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
+                      const Icon(Icons.chevron_left,
+                          size: 22, color: AppPalette.textSoft),
+                      const SizedBox(width: 4),
                       Text(
-                        profile?.fullName ?? authState.user?.email ?? 'User',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (profile != null)
-                        Text(
-                          'Grade ${profile.grade}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      Text(
-                        authState.user?.email ?? '',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        'Profile',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.textSoft,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              Text('Settings', style: theme.textTheme.displaySmall),
+              const SizedBox(height: 24),
+              _Section(
+                title: 'ACCOUNT',
+                children: [
+                  _SettingsTile(
+                    title: 'Profile',
+                    subtitle: profile?.fullName ?? 'Student',
+                    onTap: _comingSoon,
+                  ),
+                  const _Divider(),
+                  _SettingsTile(
+                    title: 'Email',
+                    subtitle: email,
+                    onTap: _comingSoon,
+                  ),
+                  const _Divider(),
+                  _SettingsTile(
+                    title: 'Password',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ChangePasswordScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _Section(
+                title: 'LEARNING',
+                children: [
+                  _SettingsTile(
+                    title: 'Daily goal',
+                    subtitle: '20 min',
+                    onTap: _comingSoon,
+                  ),
+                  const _Divider(),
+                  _ToggleTile(
+                    title: 'Reminders',
+                    value: _reminders,
+                    onChanged: (v) => setState(() => _reminders = v),
+                  ),
+                  const _Divider(),
+                  _ToggleTile(
+                    title: 'Sound',
+                    value: _sound,
+                    onChanged: (v) => setState(() => _sound = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _Section(
+                title: 'PRIVACY',
+                children: [
+                  _SettingsTile(
+                    title: 'Profile visibility',
+                    subtitle: 'Cohort only',
+                    onTap: _comingSoon,
+                  ),
+                  const _Divider(),
+                  _SettingsTile(
+                    title: 'Block list',
+                    onTap: _comingSoon,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _Card(
+                children: [
+                  _SettingsTile(
+                    title: 'Help',
+                    onTap: _comingSoon,
+                  ),
+                  const _Divider(),
+                  _SignOutTile(
+                    onTap: () async {
+                      await ref.read(authProvider.notifier).signOut();
+                      if (!context.mounted) return;
+                      context.go(AppRoutes.welcome);
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-
-          _SettingsTile(
-            icon: Icons.person_outline,
-            title: 'Profile',
-            subtitle: 'View and edit your profile',
-            onTap: () => _showComingSoon(context),
-          ),
-          _SettingsTile(
-            icon: Icons.lock_outline,
-            title: 'Password',
-            subtitle: 'Change your password',
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ChangePasswordScreen(),
-                ),
-              );
-            },
-          ),
-          _SettingsTile(
-            icon: Icons.notifications_outlined,
-            title: 'Notifications',
-            subtitle: 'Manage notification preferences',
-            onTap: () => _showComingSoon(context),
-          ),
-          _SettingsTile(
-            icon: Icons.help_outline,
-            title: 'Help',
-            subtitle: 'FAQ and support',
-            onTap: () => _showComingSoon(context),
-          ),
-          const SizedBox(height: 16),
-          _SettingsTile(
-            icon: Icons.info_outline,
-            title: 'About',
-            subtitle: 'AI Education Platform v1.0.0',
-            onTap: () => _showComingSoon(context),
-          ),
-          const SizedBox(height: 24),
-
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                await ref.read(authProvider.notifier).signOut();
-                if (!context.mounted) return;
-                context.go(AppRoutes.welcome);
-              },
-              icon: const Icon(Icons.logout, color: Colors.red),
-              label:
-                  const Text('Logout', style: TextStyle(color: Colors.red)),
-            ),
-          ),
-        ],
+        ),
       ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Coming soon')),
     );
   }
 }
 
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
+class _Section extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final List<Widget> children;
+
+  const _Section({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(title, style: AppText.eyebrow(context)),
+        ),
+        _Card(children: children),
+      ],
+    );
+  }
+}
+
+class _Card extends StatelessWidget {
+  final List<Widget> children;
+  const _Card({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppPalette.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, color: AppPalette.border);
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final String title;
+  final String? subtitle;
   final VoidCallback onTap;
 
   const _SettingsTile({
-    required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerLow,
-      margin: const EdgeInsets.only(bottom: 6),
-      child: ListTile(
-        leading: Icon(icon, color: theme.colorScheme.primary),
-        title:
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleSmall),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppPalette.textSoft,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right,
+                size: 20, color: AppPalette.textSoft),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToggleTile extends StatelessWidget {
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _ToggleTile({
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(title, style: theme.textTheme.titleSmall)),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: Colors.white,
+            activeTrackColor: AppPalette.primary,
+            inactiveThumbColor: Colors.white,
+            inactiveTrackColor: const Color(0xFFD1D5DB),
+            trackOutlineColor:
+                const WidgetStatePropertyAll(Colors.transparent),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SignOutTile extends StatelessWidget {
+  final VoidCallback onTap;
+  const _SignOutTile({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Text(
+          'Sign out',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: const Color(0xFFDC2626),
+                fontWeight: FontWeight.w600,
+              ),
+        ),
       ),
     );
   }
