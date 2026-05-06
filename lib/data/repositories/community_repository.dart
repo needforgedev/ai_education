@@ -33,6 +33,48 @@ class CommunityRepository {
         .toList();
   }
 
+  /// Activity stats for the achievements engine. Returns the counts of
+  /// threads + replies posted by this author and the set of distinct days
+  /// they were active in the community.
+  Future<({int threadCount, int distinctRepliedThreads, Set<String> activeDays})>
+      getAuthorActivity(String authorId) async {
+    final threads = await supabase
+        .from(Tables.communityThreads)
+        .select('id, created_at')
+        .eq('author_id', authorId);
+    final replies = await supabase
+        .from(Tables.communityReplies)
+        .select('thread_id, created_at')
+        .eq('author_id', authorId);
+
+    final days = <String>{};
+    for (final t in (threads as List)) {
+      final raw = (t as Map<String, dynamic>)['created_at'] as String?;
+      if (raw != null) days.add(_dayKey(DateTime.parse(raw).toLocal()));
+    }
+    final repliedThreadIds = <String>{};
+    for (final r in (replies as List)) {
+      final m = r as Map<String, dynamic>;
+      final raw = m['created_at'] as String?;
+      if (raw != null) days.add(_dayKey(DateTime.parse(raw).toLocal()));
+      final tid = m['thread_id'] as String?;
+      if (tid != null) repliedThreadIds.add(tid);
+    }
+
+    return (
+      threadCount: threads.length,
+      distinctRepliedThreads: repliedThreadIds.length,
+      activeDays: days,
+    );
+  }
+
+  static String _dayKey(DateTime dt) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
   /// Fetch all active schools (for moderator filter).
   Future<List<Map<String, String>>> getSchoolsList() async {
     final result = await supabase

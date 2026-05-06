@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../app/router.dart';
 import '../app/theme.dart';
 import '../features/auth/providers/auth_provider.dart';
+import '../features/settings/screens/edit_field_screen.dart';
 import 'change_password_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -70,13 +71,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SettingsTile(
                     title: 'Profile',
                     subtitle: profile?.fullName ?? 'Student',
-                    onTap: _comingSoon,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EditFieldScreen(
+                            kind: EditFieldKind.name,
+                            initialValue: profile?.fullName ?? '',
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const _Divider(),
                   _SettingsTile(
                     title: 'Email',
                     subtitle: email,
-                    onTap: _comingSoon,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EditFieldScreen(
+                            kind: EditFieldKind.email,
+                            initialValue: email == '—' ? '' : email,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const _Divider(),
                   _SettingsTile(

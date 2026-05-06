@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme.dart';
+import '../../../data/models/achievement.dart';
 import '../../../screens/settings_screen.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../providers/achievements_provider.dart';
 import '../providers/dashboard_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -60,7 +62,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Text('ACHIEVEMENTS', style: AppText.eyebrow(context)),
+            _AchievementsHeader(),
             const SizedBox(height: 12),
             const _AchievementsGrid(),
             const SizedBox(height: 24),
@@ -245,19 +247,59 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-class _AchievementsGrid extends StatelessWidget {
+class _AchievementsHeader extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final achAsync = ref.watch(achievementsProvider);
+    final summary = achAsync.maybeWhen(
+      data: (list) {
+        final earned = list.where((a) => a.earned).length;
+        return ' · $earned/${list.length}';
+      },
+      orElse: () => '',
+    );
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text('ACHIEVEMENTS', style: AppText.eyebrow(context)),
+        Text(
+          summary,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: AppPalette.textSoft,
+            letterSpacing: 0.6,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AchievementsGrid extends ConsumerWidget {
   const _AchievementsGrid();
 
-  static const _items = [
-    _Achievement(emoji: '🎯', label: 'Sharpshooter', earned: true),
-    _Achievement(emoji: '🔥', label: '7-day', earned: true),
-    _Achievement(emoji: '🚀', label: 'Fast start', earned: true),
-    _Achievement(emoji: '🧠', label: 'Top 10%', earned: true),
-    _Achievement(emoji: '💬', label: 'Helper', earned: true),
-    _Achievement(emoji: '✍️', label: 'Note taker', earned: true),
-    _Achievement(emoji: '🏁', label: 'First course', earned: true),
-    _Achievement(emoji: '🔒', label: 'Locked', earned: false),
-  ];
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final achAsync = ref.watch(achievementsProvider);
+    return achAsync.when(
+      loading: () => const SizedBox(
+        height: 196,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, _) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text('Could not load achievements: $err',
+            style: Theme.of(context).textTheme.bodySmall),
+      ),
+      data: (achievements) => _AchievementsLayout(achievements: achievements),
+    );
+  }
+}
+
+class _AchievementsLayout extends StatelessWidget {
+  final List<Achievement> achievements;
+  const _AchievementsLayout({required this.achievements});
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +310,7 @@ class _AchievementsGrid extends StatelessWidget {
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
-          children: _items
+          children: achievements
               .map((a) => SizedBox(
                     width: cellWidth,
                     height: 92,
@@ -281,20 +323,8 @@ class _AchievementsGrid extends StatelessWidget {
   }
 }
 
-class _Achievement {
-  final String emoji;
-  final String label;
-  final bool earned;
-
-  const _Achievement({
-    required this.emoji,
-    required this.label,
-    required this.earned,
-  });
-}
-
 class _AchievementTile extends StatelessWidget {
-  final _Achievement achievement;
+  final Achievement achievement;
 
   const _AchievementTile({required this.achievement});
 
@@ -303,41 +333,153 @@ class _AchievementTile extends StatelessWidget {
     final theme = Theme.of(context);
     final earned = achievement.earned;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppPalette.surface,
-        borderRadius: BorderRadius.circular(AppRadii.input),
-        border: Border.all(color: AppPalette.border),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Opacity(
-            opacity: earned ? 1.0 : 0.35,
-            child: Text(
-              achievement.emoji,
-              style: const TextStyle(fontSize: 22, height: 1.0),
+    return InkWell(
+      onTap: () => _showAchievementSheet(context, achievement),
+      borderRadius: BorderRadius.circular(AppRadii.input),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppPalette.surface,
+          borderRadius: BorderRadius.circular(AppRadii.input),
+          border: Border.all(color: AppPalette.border),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Opacity(
+              opacity: earned ? 1.0 : 0.35,
+              child: Text(
+                earned ? achievement.emoji : '🔒',
+                style: const TextStyle(fontSize: 22, height: 1.0),
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            achievement.label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: earned ? AppPalette.text : AppPalette.textSoft,
-              fontWeight: FontWeight.w500,
-              fontSize: 11,
-              height: 1.2,
+            const SizedBox(height: 6),
+            Text(
+              achievement.title,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: earned ? AppPalette.text : AppPalette.textSoft,
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+                height: 1.2,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+void _showAchievementSheet(BuildContext context, Achievement a) {
+  final theme = Theme.of(context);
+  final earned = a.earned;
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppPalette.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (_) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(28, 16, 28, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppPalette.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: earned
+                          ? AppPalette.primaryWash
+                          : const Color(0xFFEEF1F5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Opacity(
+                      opacity: earned ? 1.0 : 0.45,
+                      child: Text(
+                        earned ? a.emoji : '🔒',
+                        style: const TextStyle(fontSize: 30),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: earned
+                                ? AppPalette.primary
+                                : AppPalette.border,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            earned ? 'UNLOCKED' : 'LOCKED',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: earned ? Colors.white : AppPalette.textSoft,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.0,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(a.title, style: theme.textTheme.headlineSmall),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                earned ? 'How you earned it' : 'How to unlock',
+                style: AppText.eyebrow(context),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                a.description,
+                style: theme.textTheme.bodyLarge
+                    ?.copyWith(color: AppPalette.text, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _ActivityChart extends StatelessWidget {

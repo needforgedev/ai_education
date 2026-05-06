@@ -255,6 +255,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Re-fetch the role + profile + school/cohort names from Supabase and
+  /// update both in-memory state and the persistent UserCache. Call this
+  /// after any in-app edit that changes the student row or auth user.
+  Future<void> refreshProfile() async {
+    final user = _authRepo.currentUser;
+    if (user == null) return;
+    await _refreshUserProfile(user);
+  }
+
   Future<void> signOut() async {
     try {
       await _authRepo.signOut();

@@ -51,6 +51,20 @@ class StudentRepository {
     return Student.fromJson(result);
   }
 
+  /// Update the student's display name. Returns the refreshed profile.
+  Future<Student> updateFullName({
+    required String userId,
+    required String fullName,
+  }) async {
+    final result = await supabase
+        .from(Tables.students)
+        .update({'full_name': fullName})
+        .eq('id', userId)
+        .select()
+        .single();
+    return Student.fromJson(result);
+  }
+
   /// Fetch the current student's profile.
   Future<Student?> getProfile(String userId) async {
     final result = await supabase

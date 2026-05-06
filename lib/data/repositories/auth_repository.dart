@@ -40,6 +40,13 @@ class AuthRepository {
     await supabase.auth.signOut(scope: supa.SignOutScope.local);
   }
 
+  /// Trigger a Supabase email change. Supabase sends a confirmation link to
+  /// both the old and new addresses; until the user clicks the link the
+  /// active email does not change.
+  Future<void> updateEmail(String newEmail) async {
+    await supabase.auth.updateUser(supa.UserAttributes(email: newEmail));
+  }
+
   /// The currently authenticated user, or null.
   supa.User? get currentUser => supabase.auth.currentUser;
 

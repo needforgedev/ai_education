@@ -67,6 +67,18 @@ class SubmissionRepository {
     return supabase.storage.from(Buckets.submissions).download(storagePath);
   }
 
+  /// Every submission this student has made — used by the achievements engine.
+  Future<List<Submission>> getAllSubmissionsForStudent(String studentId) async {
+    final result = await supabase
+        .from(Tables.finalSubmissions)
+        .select()
+        .eq('student_id', studentId)
+        .order('submitted_at', ascending: false);
+    return (result as List)
+        .map((e) => Submission.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Fetch the existing submission for this student+course (if any).
   Future<Submission?> getSubmission({
     required String studentId,

@@ -1,5 +1,6 @@
 import '../../core/constants.dart';
 import '../../core/supabase/supabase_client.dart';
+import '../models/quiz_attempt.dart';
 import '../models/quiz_question.dart';
 
 /// Quiz reads + writes: Supabase only (online required).
@@ -13,6 +14,19 @@ class QuizRepository {
 
     return (result as List)
         .map((e) => QuizQuestion.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Every quiz attempt for a student, newest first. Used by the
+  /// achievements engine to compute first-try wins, retake improvements, etc.
+  Future<List<QuizAttempt>> getAllAttemptsForStudent(String studentId) async {
+    final result = await supabase
+        .from(Tables.quizAttempts)
+        .select()
+        .eq('student_id', studentId)
+        .order('attempted_at', ascending: false);
+    return (result as List)
+        .map((e) => QuizAttempt.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
