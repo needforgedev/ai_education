@@ -86,16 +86,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SettingsTile(
                     title: 'Email',
                     subtitle: email,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => EditFieldScreen(
-                            kind: EditFieldKind.email,
-                            initialValue: email == '—' ? '' : email,
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: null,
                   ),
                   const _Divider(),
                   _SettingsTile(
@@ -225,7 +216,9 @@ class _Divider extends StatelessWidget {
 class _SettingsTile extends StatelessWidget {
   final String title;
   final String? subtitle;
-  final VoidCallback onTap;
+
+  /// When null, the row is rendered as read-only — no ink ripple, no chevron.
+  final VoidCallback? onTap;
 
   const _SettingsTile({
     required this.title,
@@ -236,35 +229,36 @@ class _SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleSmall),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppPalette.textSoft,
-                      ),
+    final body = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleSmall),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.textSoft,
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
+          ),
+          if (onTap != null)
             const Icon(Icons.chevron_right,
                 size: 20, color: AppPalette.textSoft),
-          ],
-        ),
+        ],
       ),
     );
+
+    if (onTap == null) return body;
+    return InkWell(onTap: onTap, child: body);
   }
 }
 
